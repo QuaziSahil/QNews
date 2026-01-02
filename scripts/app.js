@@ -1,6 +1,6 @@
 /* ========================================
    Q NEWS - Main Application Script
-   RSS Fetching, AI Summarization, In-App Reader
+   Optimized: Faster loading, Working AI, Shareable URLs
    ======================================== */
 
 // Configuration
@@ -52,17 +52,17 @@ const CONFIG = {
             'https://images.unsplash.com/photo-1444653614773-995cb1ef9efa?w=600'
         ]
     },
-    articlesPerPage: 12,
-    cacheDuration: 5 * 60 * 1000
+    articlesPerPage: 12
 };
 
 // State
 let allArticles = [];
-let articlesMap = new Map(); // Store articles by ID for quick lookup
+let articlesMap = new Map();
 let displayedArticles = 0;
 let currentCategory = 'all';
 let userLocation = null;
 let isLoading = false;
+let puterReady = false; // Track Puter.js status
 
 // DOM Elements
 const elements = {
@@ -92,10 +92,58 @@ document.addEventListener('DOMContentLoaded', async () => {
     initScrollAnimations();
     initCategoryCards();
     initFilterTabs();
+    initRouter();
+
+    // Check Puter.js availability
+    checkPuterReady();
 
     await loadAllFeeds();
     hidePreloader();
+
+    // Check if URL has article ID
+    handleRouteChange();
 });
+
+// ========================================
+// URL Routing (Shareable Links)
+// ========================================
+
+function initRouter() {
+    window.addEventListener('popstate', handleRouteChange);
+}
+
+function handleRouteChange() {
+    const params = new URLSearchParams(window.location.search);
+    const articleId = params.get('article');
+
+    if (articleId && articlesMap.has(articleId)) {
+        openArticleModal(articleId, false); // Don't push state again
+    }
+}
+
+function updateURL(articleId) {
+    const url = new URL(window.location);
+    if (articleId) {
+        url.searchParams.set('article', articleId);
+    } else {
+        url.searchParams.delete('article');
+    }
+    window.history.pushState({}, '', url);
+}
+
+// ========================================
+// Puter.js Check
+// ========================================
+
+function checkPuterReady() {
+    if (typeof puter !== 'undefined' && puter.ai) {
+        puterReady = true;
+        console.log('✅ Puter.js AI is ready');
+    } else {
+        console.log('⚠️ Puter.js not available, using fallback');
+        puterReady = false;
+    }
+}
 
 // ========================================
 // Article Modal
@@ -112,32 +160,36 @@ function createArticleModal() {
             </svg>
         </button>
         <div class="article-modal-content" id="articleModalContent">
-            <!-- Content injected dynamically -->
         </div>
     `;
     document.body.appendChild(modal);
 
-    // Close on backdrop click
     modal.addEventListener('click', (e) => {
         if (e.target === modal) closeArticleModal();
     });
 
-    // Close on Escape key
     document.addEventListener('keydown', (e) => {
         if (e.key === 'Escape') closeArticleModal();
     });
 }
 
-async function openArticleModal(articleId) {
+async function openArticleModal(articleId, pushState = true) {
     const article = articlesMap.get(articleId);
     if (!article) return;
 
     const modal = document.getElementById('articleModal');
     const content = document.getElementById('articleModalContent');
 
-    // Show modal with loading state
+    // Update URL for sharing
+    if (pushState) {
+        updateURL(articleId);
+    }
+
     modal.classList.add('open');
     document.body.style.overflow = 'hidden';
+
+    // Build shareable URL
+    const shareUrl = `${window.location.origin}${window.location.pathname}?article=${articleId}`;
 
     content.innerHTML = `
         <div class="article-header">
@@ -163,36 +215,34 @@ async function openArticleModal(articleId) {
         <img src="${article.image}" alt="${article.title}" class="article-image" 
              onerror="this.src='${getRandomImage(article.category)}'">
         
-        <div class="article-ai-summary">
+        <div class="article-ai-summary" id="aiSummaryBox">
             <div class="ai-summary-header">
                 <span class="ai-summary-badge">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
                     </svg>
-                    AI Summary
+                    AI SUMMARY
                 </span>
             </div>
             <p class="ai-summary-text" id="aiSummaryText">
                 <span class="ai-summary-loading">
                     <span class="loading-spinner"></span>
-                    Generating AI summary...
+                    Generating AI-powered summary...
                 </span>
             </p>
         </div>
         
         <div class="article-body">
-            <p>${article.description || 'Full article content available at the source.'}</p>
-        </div>
-        
-        <div class="article-key-points" id="keyPointsSection" style="display: none;">
-            <h4 class="key-points-title">
+            <h4 style="color: var(--accent-tertiary); margin-bottom: 1rem; display: flex; align-items: center; gap: 0.5rem;">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M9 11l3 3L22 4"/>
-                    <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                    <polyline points="14 2 14 8 20 8"/>
+                    <line x1="16" y1="13" x2="8" y2="13"/>
+                    <line x1="16" y1="17" x2="8" y2="17"/>
                 </svg>
-                Key Points
+                Original Content
             </h4>
-            <ul class="key-points-list" id="keyPointsList"></ul>
+            <p>${article.description || 'Full article content available at the source.'}</p>
         </div>
         
         <div class="article-footer">
@@ -205,76 +255,91 @@ async function openArticleModal(articleId) {
                 Read Full Article at Source
             </button>
             <div class="article-share-btns">
-                <button class="share-btn" onclick="shareArticle('twitter', '${encodeURIComponent(article.title)}', '${encodeURIComponent(article.link)}')" title="Share on Twitter">
+                <button class="share-btn" onclick="shareArticle('twitter', '${encodeURIComponent(article.title)}', '${encodeURIComponent(shareUrl)}')" title="Share on X">
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
                         <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
                     </svg>
                 </button>
-                <button class="share-btn" onclick="shareArticle('linkedin', '${encodeURIComponent(article.title)}', '${encodeURIComponent(article.link)}')" title="Share on LinkedIn">
+                <button class="share-btn" onclick="shareArticle('linkedin', '${encodeURIComponent(article.title)}', '${encodeURIComponent(shareUrl)}')" title="Share on LinkedIn">
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
                         <path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433c-1.144 0-2.063-.926-2.063-2.065 0-1.138.92-2.063 2.063-2.063 1.14 0 2.064.925 2.064 2.063 0 1.139-.925 2.065-2.064 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/>
                     </svg>
                 </button>
-                <button class="share-btn" onclick="copyToClipboard('${article.link}')" title="Copy Link">
+                <button class="share-btn" onclick="copyToClipboard('${shareUrl}')" title="Copy Shareable Link">
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
-                        <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+                        <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/>
+                        <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>
                     </svg>
                 </button>
             </div>
         </div>
     `;
 
-    // Generate AI summary
-    await generateAISummary(article);
+    // Generate AI summary asynchronously
+    generateAISummary(article);
 }
 
 function closeArticleModal() {
     const modal = document.getElementById('articleModal');
     modal.classList.remove('open');
     document.body.style.overflow = '';
+    updateURL(null); // Clear article from URL
 }
 
 async function generateAISummary(article) {
     const summaryEl = document.getElementById('aiSummaryText');
-    const keyPointsSection = document.getElementById('keyPointsSection');
-    const keyPointsList = document.getElementById('keyPointsList');
+    const summaryBox = document.getElementById('aiSummaryBox');
+
+    if (!summaryEl) return;
 
     try {
-        if (typeof puter === 'undefined' || !puter.ai) {
-            // Fallback without AI
-            summaryEl.textContent = article.description || 'No summary available.';
-            return;
-        }
-
-        // Generate summary
-        const summaryPrompt = `You are a news summarizer. Summarize this news article in 2-3 engaging sentences. Be concise and informative:
-
-Title: ${article.title}
-Content: ${article.description}`;
-
-        const summary = await puter.ai.chat(summaryPrompt, { model: 'gpt-4o-mini' });
-        summaryEl.textContent = summary || article.description;
-
-        // Generate key points
-        const keyPointsPrompt = `Extract 3-4 key bullet points from this news. Return ONLY the bullet points, one per line, no numbers or dashes:
-
-Title: ${article.title}
-Content: ${article.description}`;
-
-        const keyPoints = await puter.ai.chat(keyPointsPrompt, { model: 'gpt-4o-mini' });
-
-        if (keyPoints) {
-            const points = keyPoints.split('\n').filter(p => p.trim().length > 0).slice(0, 4);
-            if (points.length > 0) {
-                keyPointsList.innerHTML = points.map(p => `<li>${p.replace(/^[-•*]\s*/, '')}</li>`).join('');
-                keyPointsSection.style.display = 'block';
+        // Check if Puter is ready
+        if (!puterReady) {
+            // Check again in case it loaded late
+            if (typeof puter !== 'undefined' && puter.ai) {
+                puterReady = true;
             }
         }
 
+        if (!puterReady) {
+            // Fallback: Create a smart excerpt
+            summaryEl.innerHTML = `
+                <span style="opacity: 0.7; font-size: 0.875rem;">⚠️ AI temporarily unavailable</span><br><br>
+                ${article.description || 'No summary available.'}
+            `;
+            return;
+        }
+
+        // Generate AI summary with Puter.js
+        const prompt = `You are a professional news editor. Create a compelling 2-3 sentence summary of this news article. Make it engaging and informative. Do NOT repeat the title.
+
+Title: ${article.title}
+Content: ${article.description}
+
+Write only the summary, nothing else:`;
+
+        console.log('🤖 Generating AI summary...');
+
+        const summary = await puter.ai.chat(prompt, {
+            model: 'gpt-4o-mini'
+        });
+
+        if (summary && summary.trim().length > 0) {
+            summaryEl.innerHTML = `
+                <span style="font-size: 1.1rem; line-height: 1.7;">${summary}</span>
+            `;
+            summaryBox.style.borderColor = 'rgba(16, 185, 129, 0.5)';
+            console.log('✅ AI summary generated successfully');
+        } else {
+            throw new Error('Empty response');
+        }
+
     } catch (error) {
-        console.error('AI generation failed:', error);
-        summaryEl.textContent = article.description || 'Summary generation failed.';
+        console.error('❌ AI generation failed:', error);
+        summaryEl.innerHTML = `
+            <span style="opacity: 0.7; font-size: 0.875rem;">Could not generate AI summary</span><br><br>
+            ${article.description || 'Full article available at source.'}
+        `;
     }
 }
 
@@ -288,7 +353,9 @@ function shareArticle(platform, title, url) {
 
 function copyToClipboard(text) {
     navigator.clipboard.writeText(text).then(() => {
-        showToast('Link copied to clipboard!', 'success');
+        showToast('🔗 Link copied! You can now share this article.', 'success');
+    }).catch(() => {
+        showToast('Failed to copy link', 'error');
     });
 }
 
@@ -299,7 +366,7 @@ function copyToClipboard(text) {
 function hidePreloader() {
     setTimeout(() => {
         elements.preloader?.classList.add('hidden');
-    }, 1500);
+    }, 800); // Reduced from 1500ms
 }
 
 // ========================================
@@ -309,7 +376,7 @@ function hidePreloader() {
 function initParticles() {
     if (!elements.particles) return;
 
-    const particleCount = 30;
+    const particleCount = 20; // Reduced for performance
 
     for (let i = 0; i < particleCount; i++) {
         const particle = document.createElement('div');
@@ -448,7 +515,7 @@ function filterArticles(filter) {
 }
 
 // ========================================
-// RSS Feed Fetching
+// RSS Feed Fetching (Optimized)
 // ========================================
 
 async function loadAllFeeds() {
@@ -456,15 +523,22 @@ async function loadAllFeeds() {
     showLoadingState();
 
     try {
+        // Load feeds in parallel with timeout
         const feedPromises = Object.entries(CONFIG.feeds).map(([category, url]) =>
-            fetchFeed(url, category)
+            Promise.race([
+                fetchFeed(url, category),
+                new Promise((_, reject) => setTimeout(() => reject('timeout'), 8000))
+            ]).catch(err => {
+                console.warn(`Feed ${category} failed:`, err);
+                return [];
+            })
         );
 
-        const results = await Promise.allSettled(feedPromises);
+        const results = await Promise.all(feedPromises);
 
-        results.forEach(result => {
-            if (result.status === 'fulfilled' && result.value) {
-                allArticles.push(...result.value);
+        results.forEach(feedArticles => {
+            if (Array.isArray(feedArticles)) {
+                allArticles.push(...feedArticles);
             }
         });
 
@@ -485,7 +559,7 @@ async function loadAllFeeds() {
 
     } catch (error) {
         console.error('Error loading feeds:', error);
-        showError('Failed to load news. Please try again.');
+        showError('Failed to load news. Please refresh the page.');
     }
 
     isLoading = false;
@@ -502,22 +576,21 @@ async function fetchFeed(url, category) {
         const articles = [];
 
         items.forEach((item, index) => {
-            if (index >= 20) return;
+            if (index >= 15) return; // Reduced for faster loading
 
             const title = item.querySelector('title')?.textContent || '';
             const link = item.querySelector('link')?.textContent || '';
             const description = item.querySelector('description')?.textContent || '';
             const pubDate = item.querySelector('pubDate')?.textContent || new Date().toISOString();
 
-            // Enhanced image extraction
             let image = extractImage(item, text);
 
-            // Use random category image if no image found
             if (!image) {
                 image = getRandomImage(category);
             }
 
-            const articleId = `${category}-${index}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+            // Create simple, stable ID
+            const articleId = `${category}-${index}`;
 
             articles.push({
                 id: articleId,
@@ -541,34 +614,28 @@ async function fetchFeed(url, category) {
 }
 
 function extractImage(item, rawText) {
-    // Try multiple methods to extract image
-
-    // Method 1: media:content
+    // Try multiple methods
     const mediaContent = item.querySelector('content');
     if (mediaContent?.getAttribute('url')) {
         return mediaContent.getAttribute('url');
     }
 
-    // Method 2: media:thumbnail
     const thumbnail = item.querySelector('thumbnail');
     if (thumbnail?.getAttribute('url')) {
         return thumbnail.getAttribute('url');
     }
 
-    // Method 3: enclosure
     const enclosure = item.querySelector('enclosure');
     if (enclosure?.getAttribute('url') && enclosure.getAttribute('type')?.includes('image')) {
         return enclosure.getAttribute('url');
     }
 
-    // Method 4: Extract from description HTML
     const description = item.querySelector('description')?.textContent || '';
     const imgMatch = description.match(/<img[^>]+src=["']([^"']+)["']/i);
     if (imgMatch?.[1]) {
         return imgMatch[1];
     }
 
-    // Method 5: Look for image in content:encoded
     const contentEncoded = item.querySelector('encoded')?.textContent || '';
     const contentImgMatch = contentEncoded.match(/<img[^>]+src=["']([^"']+)["']/i);
     if (contentImgMatch?.[1]) {
@@ -584,37 +651,7 @@ function getRandomImage(category) {
 }
 
 // ========================================
-// AI Summarization (Puter.js)
-// ========================================
-
-async function summarizeArticle(article) {
-    if (article.summarized || !article.description) return article;
-
-    try {
-        if (typeof puter === 'undefined' || !puter.ai) {
-            article.summary = truncateText(article.description, 150);
-            return article;
-        }
-
-        const prompt = `Summarize this news in 2 punchy sentences (max 80 words): "${article.description}"`;
-
-        const response = await puter.ai.chat(prompt, {
-            model: 'gpt-4o-mini'
-        });
-
-        article.summary = response || truncateText(article.description, 150);
-        article.summarized = true;
-
-    } catch (error) {
-        console.error('AI summarization failed:', error);
-        article.summary = truncateText(article.description, 150);
-    }
-
-    return article;
-}
-
-// ========================================
-// Rendering Functions
+// Rendering Functions (No AI on cards for speed)
 // ========================================
 
 function renderTrendingCarousel() {
@@ -657,13 +694,11 @@ function renderNewsGrid(articles = null) {
         elements.newsGrid.innerHTML = '';
     }
 
-    toShow.forEach(async (article, index) => {
-        await summarizeArticle(article);
-
+    // Render cards immediately without waiting for AI
+    toShow.forEach((article, index) => {
         const card = createNewsCard(article, index);
         elements.newsGrid.appendChild(card);
-
-        setTimeout(() => card.classList.add('visible'), index * 100);
+        setTimeout(() => card.classList.add('visible'), index * 50);
     });
 
     if (elements.loadMoreBtn) {
@@ -674,7 +709,7 @@ function renderNewsGrid(articles = null) {
 function createNewsCard(article, index) {
     const card = document.createElement('article');
     card.className = 'news-card reveal';
-    card.style.transitionDelay = `${index * 0.1}s`;
+    card.style.transitionDelay = `${index * 0.05}s`;
     card.onclick = () => openArticleModal(article.id);
 
     card.innerHTML = `
@@ -687,10 +722,9 @@ function createNewsCard(article, index) {
             <div class="news-card-meta">
                 <span class="news-card-source">${article.source}</span>
                 <span class="news-card-time">${getTimeAgo(article.pubDate)}</span>
-                ${article.summarized ? '<span class="ai-badge">AI Summary</span>' : ''}
             </div>
             <h3 class="news-card-title">${article.title}</h3>
-            <p class="news-card-summary">${article.summary || truncateText(article.description, 120)}</p>
+            <p class="news-card-summary">${truncateText(article.description, 120)}</p>
         </div>
         <div class="news-card-footer">
             <div class="news-card-tags">
@@ -752,14 +786,12 @@ async function getLocationName() {
         const data = await response.json();
 
         const city = data.address?.city || data.address?.town || data.address?.village || 'Your Area';
-        const country = data.address?.country || '';
 
         if (elements.locationTitle) {
             elements.locationTitle.textContent = `News from ${city}`;
         }
 
         userLocation.name = city;
-        userLocation.country = country;
 
     } catch (error) {
         console.error('Reverse geocoding failed:', error);
@@ -834,7 +866,7 @@ function getTimeAgo(dateString) {
 
 function animateNumber(element, target) {
     let current = 0;
-    const increment = Math.ceil(target / 30);
+    const increment = Math.ceil(target / 20);
     const timer = setInterval(() => {
         current += increment;
         if (current >= target) {
@@ -842,7 +874,7 @@ function animateNumber(element, target) {
             clearInterval(timer);
         }
         element.textContent = current;
-    }, 30);
+    }, 20);
 }
 
 // ========================================
