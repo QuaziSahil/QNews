@@ -755,7 +755,7 @@ function filterArticles(filter) {
 }
 
 // ========================================
-// GNews.io API Fetching
+// Load Anime News (via Vercel Serverless Function)
 // ========================================
 
 async function loadAllFeeds() {
@@ -763,9 +763,10 @@ async function loadAllFeeds() {
     showLoadingState();
 
     try {
-        // Fetch from each RSS feed category
-        const feedPromises = Object.entries(CONFIG.feeds).map(([category, url]) =>
-            fetchRSSFeed(url, category).catch(err => {
+        // Fetch from our serverless API for each category
+        const categories = ['anime', 'manga', 'crunchyroll', 'japan'];
+        const feedPromises = categories.map(category =>
+            fetchFromAPI(category).catch(err => {
                 console.warn(`Feed ${category} failed:`, err.message);
                 return [];
             })
@@ -793,10 +794,10 @@ async function loadAllFeeds() {
 
         // FAILSAFE: If no articles loaded, load demo data
         if (allArticles.length === 0) {
-            console.warn('⚠️ RSS feeds failed. Loading Demo/Fallback Data.');
+            console.warn('⚠️ API failed. Loading Demo/Fallback Data.');
             loadDemoData();
         } else {
-            console.log(`✅ Loaded ${allArticles.length} total anime news articles`);
+            console.log(`✅ Loaded ${allArticles.length} real anime news articles!`);
             renderTrendingCarousel();
             renderNewsGrid();
         }
@@ -807,6 +808,77 @@ async function loadAllFeeds() {
     }
 
     isLoading = false;
+}
+
+// Fetch RSS via our serverless API (no CORS issues!)
+async function fetchFromAPI(category) {
+    const response = await fetch(`/api/rss?category=${category}`);
+
+    if (!response.ok) {
+        throw new Error(`API error: ${response.status}`);
+    }
+
+    const result = await response.json();
+
+    if (!result.success || !result.data) {
+        throw new Error('Invalid API response');
+    }
+
+    // Parse the RSS XML
+    const parser = new DOMParser();
+    const xml = parser.parseFromString(result.data, 'text/xml');
+
+    const items = xml.querySelectorAll('item');
+    if (items.length === 0) {
+        console.warn(`No items found for ${category}`);
+        return [];
+    }
+
+    const articles = [];
+
+    items.forEach((item, index) => {
+        if (index >= 15) return;
+
+        const title = item.querySelector('title')?.textContent || '';
+        const link = item.querySelector('link')?.textContent || '';
+        const description = item.querySelector('description')?.textContent || '';
+        const pubDate = item.querySelector('pubDate')?.textContent || new Date().toISOString();
+        const source = item.querySelector('source')?.textContent || 'Google News';
+
+        // Try to extract image
+        let image = null;
+        const mediaContent = item.querySelector('content');
+        if (mediaContent?.getAttribute('url')) {
+            image = mediaContent.getAttribute('url');
+        }
+        if (!image) {
+            const imgMatch = description.match(/<img[^>]+src=["']([^"']+)["']/i);
+            if (imgMatch?.[1]) {
+                image = imgMatch[1];
+            }
+        }
+        if (!image) {
+            image = getRandomImage(category);
+        }
+
+        const cleanDesc = description.replace(/<[^>]*>/g, '').trim();
+
+        articles.push({
+            id: `${category}-${index}`,
+            title: cleanText(title),
+            description: cleanDesc.substring(0, 300),
+            content: cleanDesc,
+            bulletPoints: extractBulletPoints(cleanDesc, title),
+            link,
+            pubDate,
+            image,
+            category,
+            source: source || 'Anime News'
+        });
+    });
+
+    console.log(`✅ Loaded ${articles.length} articles for ${category}`);
+    return articles;
 }
 
 // Fetch and parse RSS feed via AllOrigins proxy
