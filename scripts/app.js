@@ -5,7 +5,12 @@
 
 // Configuration
 const CONFIG = {
-    corsProxy: 'https://api.allorigins.win/raw?url=',
+    corsProxies: [
+        'https://corsproxy.io/?',
+        'https://api.codetabs.com/v1/proxy?quest=',
+        'https://thingproxy.freeboard.io/fetch/'
+    ],
+    currentProxyIndex: 0,
     feeds: {
         tech: 'https://feeds.feedburner.com/TechCrunch',
         world: 'https://feeds.bbci.co.uk/news/world/rss.xml',
@@ -566,51 +571,66 @@ async function loadAllFeeds() {
 }
 
 async function fetchFeed(url, category) {
-    try {
-        const response = await fetch(CONFIG.corsProxy + encodeURIComponent(url));
-        const text = await response.text();
-        const parser = new DOMParser();
-        const xml = parser.parseFromString(text, 'text/xml');
+    // Try each proxy until one works
+    for (let i = 0; i < CONFIG.corsProxies.length; i++) {
+        try {
+            const proxy = CONFIG.corsProxies[i];
+            const proxyUrl = proxy + encodeURIComponent(url);
 
-        const items = xml.querySelectorAll('item');
-        const articles = [];
+            const response = await fetch(proxyUrl);
+            if (!response.ok) continue;
 
-        items.forEach((item, index) => {
-            if (index >= 15) return; // Reduced for faster loading
+            const text = await response.text();
+            if (!text || text.length < 100) continue;
 
-            const title = item.querySelector('title')?.textContent || '';
-            const link = item.querySelector('link')?.textContent || '';
-            const description = item.querySelector('description')?.textContent || '';
-            const pubDate = item.querySelector('pubDate')?.textContent || new Date().toISOString();
+            const parser = new DOMParser();
+            const xml = parser.parseFromString(text, 'text/xml');
 
-            let image = extractImage(item, text);
+            const items = xml.querySelectorAll('item');
+            if (items.length === 0) continue;
 
-            if (!image) {
-                image = getRandomImage(category);
-            }
+            const articles = [];
 
-            // Create simple, stable ID
-            const articleId = `${category}-${index}`;
+            items.forEach((item, index) => {
+                if (index >= 15) return;
 
-            articles.push({
-                id: articleId,
-                title: cleanText(title),
-                description: cleanText(description),
-                link,
-                pubDate,
-                image,
-                category,
-                source: getSourceName(url),
-                summarized: false
+                const title = item.querySelector('title')?.textContent || '';
+                const link = item.querySelector('link')?.textContent || '';
+                const description = item.querySelector('description')?.textContent || '';
+                const pubDate = item.querySelector('pubDate')?.textContent || new Date().toISOString();
+
+                let image = extractImage(item, text);
+
+                if (!image) {
+                    image = getRandomImage(category);
+                }
+
+                const articleId = `${category}-${index}`;
+
+                articles.push({
+                    id: articleId,
+                    title: cleanText(title),
+                    description: cleanText(description),
+                    link,
+                    pubDate,
+                    image,
+                    category,
+                    source: getSourceName(url),
+                    summarized: false
+                });
             });
-        });
 
-        return articles;
+            console.log(`✅ Loaded ${articles.length} articles for ${category} via proxy ${i + 1}`);
+            return articles;
 
-    } catch (error) {
-        console.error(`Error fetching ${category}:`, error);
-        return [];
+        } catch (error) {
+            console.warn(`Proxy ${i + 1} failed for ${category}:`, error.message);
+            continue;
+        }
     }
+
+    console.error(`❌ All proxies failed for ${category}`);
+    return [];
 }
 
 function extractImage(item, rawText) {
