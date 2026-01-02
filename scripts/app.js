@@ -1,15 +1,25 @@
 /* ========================================
    Q NEWS - Main Application Script
-   Powered by NewsAPI with Indian News Focus
+   Indian News Focus with RSS Feeds
    ======================================== */
 
 // Configuration
 const CONFIG = {
-    newsApiKey: '551b83b440be41659bec53180adead18',
-    newsApiBase: 'https://newsapi.org/v2',
-    country: 'in', // India
-    categories: ['general', 'technology', 'sports', 'entertainment', 'science', 'business'],
-    pageSize: 20, // Articles per category
+    corsProxies: [
+        'https://api.allorigins.win/raw?url=',
+        'https://corsproxy.io/?',
+        'https://api.codetabs.com/v1/proxy?quest='
+    ],
+    currentProxyIndex: 0,
+    feeds: {
+        // Indian News Sources
+        general: 'https://timesofindia.indiatimes.com/rssfeedstopstories.cms',
+        technology: 'https://feeds.feedburner.com/gadgets360-latest',
+        sports: 'https://timesofindia.indiatimes.com/rssfeeds/4719148.cms',
+        entertainment: 'https://timesofindia.indiatimes.com/rssfeeds/1081479906.cms',
+        business: 'https://economictimes.indiatimes.com/rssfeedstopstories.cms',
+        science: 'https://www.sciencedaily.com/rss/all.xml'
+    },
     categoryImages: {
         general: [
             'https://images.unsplash.com/photo-1495020689067-958852a7765e?w=800',
@@ -696,7 +706,7 @@ function filterArticles(filter) {
 }
 
 // ========================================
-// NewsAPI Fetching (Indian News with HD Images)
+// RSS Feed Fetching (Indian News Sources)
 // ========================================
 
 async function loadAllFeeds() {
@@ -704,16 +714,22 @@ async function loadAllFeeds() {
     showLoadingState();
 
     try {
-        // Fetch all categories in parallel
-        const categoryPromises = CONFIG.categories.map(category =>
-            fetchNewsAPI(category)
+        // Load feeds in parallel with timeout
+        const feedPromises = Object.entries(CONFIG.feeds).map(([category, url]) =>
+            Promise.race([
+                fetchFeed(url, category),
+                new Promise((_, reject) => setTimeout(() => reject('timeout'), 10000))
+            ]).catch(err => {
+                console.warn(`Feed ${category} failed:`, err);
+                return [];
+            })
         );
 
-        const results = await Promise.all(categoryPromises);
+        const results = await Promise.all(feedPromises);
 
-        results.forEach(categoryArticles => {
-            if (Array.isArray(categoryArticles)) {
-                allArticles.push(...categoryArticles);
+        results.forEach(feedArticles => {
+            if (Array.isArray(feedArticles)) {
+                allArticles.push(...feedArticles);
             }
         });
 
@@ -729,71 +745,83 @@ async function loadAllFeeds() {
             animateNumber(elements.totalArticles, allArticles.length);
         }
 
-        console.log(`✅ Loaded ${allArticles.length} total articles from NewsAPI`);
+        console.log(`✅ Loaded ${allArticles.length} total articles`);
 
         renderTrendingCarousel();
         renderNewsGrid();
 
     } catch (error) {
-        console.error('Error loading news:', error);
+        console.error('Error loading feeds:', error);
         showError('Failed to load news. Please refresh the page.');
     }
 
     isLoading = false;
 }
 
-async function fetchNewsAPI(category) {
-    try {
-        // NewsAPI free tier requires CORS proxy in production
-        const newsApiUrl = `${CONFIG.newsApiBase}/top-headlines?country=${CONFIG.country}&category=${category}&pageSize=${CONFIG.pageSize}&apiKey=${CONFIG.newsApiKey}`;
+async function fetchFeed(feedUrl, category) {
+    // Try each proxy until one works
+    for (let i = 0; i < CONFIG.corsProxies.length; i++) {
+        try {
+            const proxy = CONFIG.corsProxies[i];
+            const proxyUrl = proxy + encodeURIComponent(feedUrl);
 
-        // Use CORS proxy for production
-        const corsProxy = 'https://corsproxy.io/?';
-        const url = corsProxy + encodeURIComponent(newsApiUrl);
+            const response = await fetch(proxyUrl);
+            if (!response.ok) continue;
 
-        const response = await fetch(url);
-        const data = await response.json();
+            const text = await response.text();
+            if (!text || text.length < 100) continue;
 
-        if (data.status !== 'ok' || !data.articles) {
-            console.warn(`NewsAPI error for ${category}:`, data.message || 'Unknown error');
-            return [];
-        }
+            const parser = new DOMParser();
+            const xml = parser.parseFromString(text, 'text/xml');
 
-        const articles = data.articles
-            .filter(article => article.title && article.title !== '[Removed]')
-            .map((article, index) => {
-                // Get HD image from API or fallback
-                let image = article.urlToImage;
-                if (!image || image.includes('placeholder')) {
+            const items = xml.querySelectorAll('item');
+            if (items.length === 0) continue;
+
+            const articles = [];
+
+            items.forEach((item, index) => {
+                if (index >= 20) return;
+
+                const title = item.querySelector('title')?.textContent || '';
+                const link = item.querySelector('link')?.textContent || '';
+                const description = item.querySelector('description')?.textContent || '';
+                const pubDate = item.querySelector('pubDate')?.textContent || new Date().toISOString();
+
+                let image = extractImage(item, text);
+                if (!image) {
                     image = getRandomImage(category);
                 }
 
-                // Extract content for bullet points
-                const content = article.content || article.description || '';
-                const bulletPoints = extractBulletPoints(content, article.title);
+                const content = cleanText(description);
+                const bulletPoints = extractBulletPoints(content, title);
 
-                return {
-                    id: `${category}-${index}`,
-                    title: article.title,
-                    description: article.description || '',
+                const articleId = `${category}-${index}`;
+
+                articles.push({
+                    id: articleId,
+                    title: cleanText(title),
+                    description: content,
                     content: content,
                     bulletPoints: bulletPoints,
-                    link: article.url,
-                    pubDate: article.publishedAt,
-                    image: image,
-                    category: category,
-                    source: article.source?.name || 'News',
-                    author: article.author || null
-                };
+                    link,
+                    pubDate,
+                    image,
+                    category,
+                    source: getSourceName(feedUrl)
+                });
             });
 
-        console.log(`✅ Loaded ${articles.length} ${category} articles from India`);
-        return articles;
+            console.log(`✅ Loaded ${articles.length} articles for ${category} via proxy ${i + 1}`);
+            return articles;
 
-    } catch (error) {
-        console.error(`Error fetching ${category}:`, error);
-        return [];
+        } catch (error) {
+            console.warn(`Proxy ${i + 1} failed for ${category}:`, error.message);
+            continue;
+        }
     }
+
+    console.error(`❌ All proxies failed for ${category}`);
+    return [];
 }
 
 // Extract bullet points from content
