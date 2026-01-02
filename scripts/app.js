@@ -6,7 +6,7 @@
 // Configuration
 const CONFIG = {
     // GNews.io API (Free tier: 100 requests/day, 10 articles/request)
-    gnewsApiKey: 'YOUR_GNEWS_API_KEY', // Get free key at https://gnews.io/
+    gnewsApiKey: '1bc056413abc05db4bae2fe021208af7',
     gnewsBaseUrl: 'https://gnews.io/api/v4/top-headlines',
     topics: ['general', 'technology', 'sports', 'entertainment', 'business', 'science'],
     country: 'in', // India
