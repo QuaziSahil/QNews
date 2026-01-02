@@ -298,54 +298,82 @@ async function generateAISummary(article) {
     if (!summaryEl) return;
 
     try {
-        // Check if Puter is ready
-        if (!puterReady) {
-            // Check again in case it loaded late
-            if (typeof puter !== 'undefined' && puter.ai) {
-                puterReady = true;
-            }
-        }
+        // Generate smart summary locally (no API needed!)
+        const summary = createSmartSummary(article.description, article.title);
 
-        if (!puterReady) {
-            // Fallback: Create a smart excerpt
-            summaryEl.innerHTML = `
-                <span style="opacity: 0.7; font-size: 0.875rem;">⚠️ AI temporarily unavailable</span><br><br>
-                ${article.description || 'No summary available.'}
-            `;
-            return;
-        }
-
-        // Generate AI summary with Puter.js
-        const prompt = `You are a professional news editor. Create a compelling 2-3 sentence summary of this news article. Make it engaging and informative. Do NOT repeat the title.
-
-Title: ${article.title}
-Content: ${article.description}
-
-Write only the summary, nothing else:`;
-
-        console.log('🤖 Generating AI summary...');
-
-        const summary = await puter.ai.chat(prompt, {
-            model: 'gpt-4o-mini'
-        });
-
-        if (summary && summary.trim().length > 0) {
-            summaryEl.innerHTML = `
-                <span style="font-size: 1.1rem; line-height: 1.7;">${summary}</span>
-            `;
-            summaryBox.style.borderColor = 'rgba(16, 185, 129, 0.5)';
-            console.log('✅ AI summary generated successfully');
-        } else {
-            throw new Error('Empty response');
-        }
+        summaryEl.innerHTML = `
+            <span style="font-size: 1.1rem; line-height: 1.7;">${summary}</span>
+        `;
+        summaryBox.style.borderColor = 'rgba(99, 102, 241, 0.5)';
 
     } catch (error) {
-        console.error('❌ AI generation failed:', error);
-        summaryEl.innerHTML = `
-            <span style="opacity: 0.7; font-size: 0.875rem;">Could not generate AI summary</span><br><br>
-            ${article.description || 'Full article available at source.'}
-        `;
+        console.error('Summary generation failed:', error);
+        summaryEl.innerHTML = article.description || 'Full article available at source.';
     }
+}
+
+// Smart local text summarization (no API required!)
+function createSmartSummary(text, title) {
+    if (!text || text.length < 50) {
+        return text || 'Read the full article for more details.';
+    }
+
+    // Clean the text
+    let cleanedText = text
+        .replace(/\s+/g, ' ')
+        .replace(/\[.*?\]/g, '')
+        .trim();
+
+    // Split into sentences
+    const sentences = cleanedText.match(/[^.!?]+[.!?]+/g) || [cleanedText];
+
+    // Get first 2-3 most informative sentences
+    let summaryParts = [];
+    let totalLength = 0;
+    const maxLength = 250;
+
+    for (let sentence of sentences) {
+        sentence = sentence.trim();
+
+        // Skip very short sentences or ones that seem like metadata
+        if (sentence.length < 20) continue;
+        if (sentence.toLowerCase().includes('click here')) continue;
+        if (sentence.toLowerCase().includes('read more')) continue;
+        if (sentence.toLowerCase().includes('subscribe')) continue;
+
+        // Don't repeat the title
+        if (title && sentence.toLowerCase().includes(title.toLowerCase().substring(0, 30))) {
+            continue;
+        }
+
+        if (totalLength + sentence.length <= maxLength) {
+            summaryParts.push(sentence);
+            totalLength += sentence.length;
+        }
+
+        if (summaryParts.length >= 2) break;
+    }
+
+    // If we have content, return it
+    if (summaryParts.length > 0) {
+        let summary = summaryParts.join(' ');
+
+        // Add emphasis to key words
+        const emphasisWords = ['breaking', 'exclusive', 'major', 'urgent', 'first', 'new', 'latest'];
+        emphasisWords.forEach(word => {
+            const regex = new RegExp(`\\b(${word})\\b`, 'gi');
+            summary = summary.replace(regex, '<strong>$1</strong>');
+        });
+
+        return summary;
+    }
+
+    // Fallback: just truncate nicely
+    if (cleanedText.length > maxLength) {
+        return cleanedText.substring(0, maxLength).trim() + '...';
+    }
+
+    return cleanedText;
 }
 
 function shareArticle(platform, title, url) {
