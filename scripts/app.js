@@ -5,22 +5,12 @@
 
 // Configuration
 const CONFIG = {
-    corsProxies: [
-        'https://api.codetabs.com/v1/proxy?quest=',
-        'https://corsproxy.io/?',
-        'https://api.allorigins.win/raw?url=',
-        'https://thingproxy.freeboard.io/fetch/'
-    ],
-    currentProxyIndex: 0,
-    feeds: {
-        // Indian News Sources
-        general: 'https://timesofindia.indiatimes.com/rssfeedstopstories.cms',
-        technology: 'https://feeds.feedburner.com/gadgets360-latest',
-        sports: 'https://timesofindia.indiatimes.com/rssfeeds/4719148.cms',
-        entertainment: 'https://timesofindia.indiatimes.com/rssfeeds/1081479906.cms',
-        business: 'https://economictimes.indiatimes.com/rssfeedstopstories.cms',
-        science: 'https://www.sciencedaily.com/rss/all.xml'
-    },
+    // GNews.io API (Free tier: 100 requests/day, 10 articles/request)
+    gnewsApiKey: 'YOUR_GNEWS_API_KEY', // Get free key at https://gnews.io/
+    gnewsBaseUrl: 'https://gnews.io/api/v4/top-headlines',
+    topics: ['general', 'technology', 'sports', 'entertainment', 'business', 'science'],
+    country: 'in', // India
+    lang: 'en',
     categoryImages: {
         general: [
             'https://images.unsplash.com/photo-1495020689067-958852a7765e?w=800',
@@ -772,7 +762,7 @@ function filterArticles(filter) {
 }
 
 // ========================================
-// RSS Feed Fetching (Indian News Sources)
+// GNews.io API Fetching
 // ========================================
 
 async function loadAllFeeds() {
@@ -780,22 +770,19 @@ async function loadAllFeeds() {
     showLoadingState();
 
     try {
-        // Load feeds in parallel with timeout
-        const feedPromises = Object.entries(CONFIG.feeds).map(([category, url]) =>
-            Promise.race([
-                fetchFeed(url, category),
-                new Promise((_, reject) => setTimeout(() => reject('timeout'), 10000))
-            ]).catch(err => {
-                console.warn(`Feed ${category} failed:`, err);
+        // Fetch from GNews.io API for each topic
+        const topicPromises = CONFIG.topics.map(topic =>
+            fetchGNewsAPI(topic).catch(err => {
+                console.warn(`GNews ${topic} failed:`, err);
                 return [];
             })
         );
 
-        const results = await Promise.all(feedPromises);
+        const results = await Promise.all(topicPromises);
 
-        results.forEach(feedArticles => {
-            if (Array.isArray(feedArticles)) {
-                allArticles.push(...feedArticles);
+        results.forEach(topicArticles => {
+            if (Array.isArray(topicArticles)) {
+                allArticles.push(...topicArticles);
             }
         });
 
@@ -811,22 +798,56 @@ async function loadAllFeeds() {
             animateNumber(elements.totalArticles, allArticles.length);
         }
 
-        // FAILSAFE: If no articles loaded (e.g. proxy blocks), load demo data
+        // FAILSAFE: If no articles loaded, load demo data
         if (allArticles.length === 0) {
-            console.warn('⚠️ Network failed. Loading Demo/Fallback Data.');
+            console.warn('⚠️ GNews API failed. Loading Demo/Fallback Data.');
             loadDemoData();
         } else {
-            console.log(`✅ Loaded ${allArticles.length} total articles`);
+            console.log(`✅ Loaded ${allArticles.length} total articles from GNews.io`);
             renderTrendingCarousel();
             renderNewsGrid();
         }
 
     } catch (error) {
-        console.error('Error loading feeds:', error);
-        loadDemoData(); // Fallback on error
+        console.error('Error loading GNews:', error);
+        loadDemoData();
     }
 
     isLoading = false;
+}
+
+// Fetch articles from GNews.io API
+async function fetchGNewsAPI(topic) {
+    const url = `${CONFIG.gnewsBaseUrl}?topic=${topic}&country=${CONFIG.country}&lang=${CONFIG.lang}&max=10&apikey=${CONFIG.gnewsApiKey}`;
+
+    const response = await fetch(url);
+
+    if (!response.ok) {
+        throw new Error(`GNews API error: ${response.status}`);
+    }
+
+    const data = await response.json();
+
+    if (!data.articles || data.articles.length === 0) {
+        console.warn(`No articles found for topic: ${topic}`);
+        return [];
+    }
+
+    return data.articles.map((article, index) => {
+        const content = article.description || article.content || '';
+        return {
+            id: `${topic}-${index}`,
+            title: article.title,
+            description: content,
+            content: content,
+            bulletPoints: extractBulletPoints(content, article.title),
+            link: article.url,
+            pubDate: article.publishedAt,
+            image: article.image || getRandomImage(topic), // GNews provides image directly!
+            category: topic,
+            source: article.source?.name || 'GNews'
+        };
+    });
 }
 
 // Failsafe: Hardcoded demo data so app never looks empty
