@@ -228,11 +228,14 @@ async function openArticleModal(articleId, pushState = true) {
                 <div class="share-card-decoration decoration-1"></div>
                 <div class="share-card-decoration decoration-2"></div>
                 
-                <div class="share-card-header">
-                    <div class="share-card-branding">
+                <!-- Hero Image with Overlay -->
+                <div class="share-card-hero">
+                    <img src="${article.image}" alt="${article.title}" 
+                         onerror="this.src='${getRandomImage(article.category)}'" crossorigin="anonymous">
+                    <div class="share-card-hero-branding">
                         <div class="share-card-logo">
                             <div class="logo-icon">Q</div>
-                            <span>NEWS</span>
+                            <span class="logo-text">NEWS</span>
                         </div>
                         <span class="share-card-category ${article.category}">${article.category.toUpperCase()}</span>
                     </div>
