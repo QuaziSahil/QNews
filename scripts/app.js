@@ -329,51 +329,37 @@ function closeArticleModal() {
     updateURL(null); // Clear article from URL
 }
 
-// Fetch the actual og:image from article source for accurate share card images
-async function fetchArticleOGImage(articleUrl, articleCategory) {
+// Fetch the actual og:image using Microlink.io API (reliable, no CORS issues)
+async function fetchArticleOGImage(articleUrl) {
     try {
-        // Use the first working proxy
-        const proxy = CONFIG.corsProxies[0];
-        const proxyUrl = proxy + encodeURIComponent(articleUrl);
+        // Microlink.io API - extracts og:image reliably without CORS issues
+        const apiUrl = `https://api.microlink.io?url=${encodeURIComponent(articleUrl)}`;
 
-        const response = await fetch(proxyUrl, {
-            signal: AbortSignal.timeout(5000) // 5 second timeout
+        const response = await fetch(apiUrl, {
+            signal: AbortSignal.timeout(8000) // 8 second timeout
         });
 
         if (!response.ok) {
-            console.warn('OG fetch failed, using fallback');
+            console.warn('Microlink API failed:', response.status);
             return null;
         }
 
-        const html = await response.text();
+        const data = await response.json();
 
-        // Extract og:image from HTML
-        const ogImageMatch = html.match(/<meta[^>]+property=["']og:image["'][^>]+content=["']([^"']+)["']/i) ||
-            html.match(/<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:image["']/i);
-
-        if (ogImageMatch && ogImageMatch[1]) {
-            let ogImage = ogImageMatch[1];
-            // Ensure full URL
-            if (ogImage.startsWith('//')) {
-                ogImage = 'https:' + ogImage;
-            } else if (!ogImage.startsWith('http')) {
-                // Relative URL - try to make absolute
-                const urlObj = new URL(articleUrl);
-                ogImage = urlObj.origin + ogImage;
-            }
-            console.log('✅ Found og:image:', ogImage);
-            return ogImage;
+        // Check if we got an image
+        if (data.status === 'success' && data.data?.image?.url) {
+            console.log('✅ Microlink found image:', data.data.image.url);
+            return data.data.image.url;
         }
 
-        // Fallback: try twitter:image
-        const twitterImageMatch = html.match(/<meta[^>]+name=["']twitter:image["'][^>]+content=["']([^"']+)["']/i);
-        if (twitterImageMatch && twitterImageMatch[1]) {
-            console.log('✅ Found twitter:image:', twitterImageMatch[1]);
-            return twitterImageMatch[1];
+        // Fallback: try logo if no image
+        if (data.data?.logo?.url) {
+            console.log('✅ Microlink found logo:', data.data.logo.url);
+            return data.data.logo.url;
         }
 
     } catch (error) {
-        console.warn('OG image fetch error:', error.message);
+        console.warn('Microlink fetch error:', error.message);
     }
 
     return null;
@@ -384,11 +370,29 @@ async function updateShareCardImage(article) {
     const imgElement = document.getElementById('shareCardImage');
     if (!imgElement || !article.link) return;
 
-    const ogImage = await fetchArticleOGImage(article.link, article.category);
+    // Show loading state
+    imgElement.style.opacity = '0.7';
+
+    const ogImage = await fetchArticleOGImage(article.link);
+
     if (ogImage) {
-        imgElement.src = ogImage;
-        // Also update the article object so download uses this image
-        article.image = ogImage;
+        // Preload the image before swapping
+        const tempImg = new Image();
+        tempImg.crossOrigin = 'anonymous';
+        tempImg.onload = () => {
+            imgElement.src = ogImage;
+            imgElement.style.opacity = '1';
+            // Update article object so download uses this image
+            article.image = ogImage;
+            console.log('✅ Share card image updated');
+        };
+        tempImg.onerror = () => {
+            imgElement.style.opacity = '1';
+            console.warn('❌ og:image failed to load, keeping fallback');
+        };
+        tempImg.src = ogImage;
+    } else {
+        imgElement.style.opacity = '1';
     }
 }
 

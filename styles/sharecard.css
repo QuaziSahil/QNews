@@ -195,7 +195,8 @@
 
 /* Bullet Points - 2 items, 1 line each */
 .share-card-bullets {
-    margin-top: auto;
+    margin-top: 8px;
+    /* Small consistent gap instead of auto */
 }
 
 .bullets-list {
