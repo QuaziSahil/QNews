@@ -224,9 +224,9 @@ async function openArticleModal(articleId, pushState = true) {
                 <div class="share-card-decoration decoration-1"></div>
                 <div class="share-card-decoration decoration-2"></div>
                 
-                <!-- Hero Image with Overlay -->
+                <!-- Hero Image with Overlay (will be updated with og:image) -->
                 <div class="share-card-hero">
-                    <img src="${article.image}" alt="${article.title}" 
+                    <img id="shareCardImage" src="${article.image}" alt="${article.title}" 
                          onerror="this.src='${getRandomImage(article.category)}'" crossorigin="anonymous">
                     <div class="share-card-hero-branding">
                         <div class="share-card-logo">
@@ -248,7 +248,7 @@ async function openArticleModal(articleId, pushState = true) {
                     ${article.bulletPoints && article.bulletPoints.length > 0 ? `
                     <div class="share-card-bullets">
                         <ul class="bullets-list">
-                            ${article.bulletPoints.map(point => `<li>${point}</li>`).join('')}
+                            ${article.bulletPoints.slice(0, 2).map(point => `<li>${truncateText(point, 80)}</li>`).join('')}
                         </ul>
                     </div>
                     ` : ''}
@@ -279,12 +279,12 @@ async function openArticleModal(articleId, pushState = true) {
             </div>
             
             <button class="download-card-btn" onclick="downloadShareCard('${article.id}')">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
                     <polyline points="7 10 12 15 17 10"/>
                     <line x1="12" y1="15" x2="12" y2="3"/>
                 </svg>
-                Download for Social Media
+                Download Card
             </button>
         </div>
         
@@ -317,6 +317,9 @@ async function openArticleModal(articleId, pushState = true) {
             </div>
         </div>
     `;
+
+    // Fetch and update the share card image with the real og:image from article source
+    updateShareCardImage(article);
 }
 
 function closeArticleModal() {
@@ -324,6 +327,69 @@ function closeArticleModal() {
     modal.classList.remove('open');
     document.body.style.overflow = '';
     updateURL(null); // Clear article from URL
+}
+
+// Fetch the actual og:image from article source for accurate share card images
+async function fetchArticleOGImage(articleUrl, articleCategory) {
+    try {
+        // Use the first working proxy
+        const proxy = CONFIG.corsProxies[0];
+        const proxyUrl = proxy + encodeURIComponent(articleUrl);
+
+        const response = await fetch(proxyUrl, {
+            signal: AbortSignal.timeout(5000) // 5 second timeout
+        });
+
+        if (!response.ok) {
+            console.warn('OG fetch failed, using fallback');
+            return null;
+        }
+
+        const html = await response.text();
+
+        // Extract og:image from HTML
+        const ogImageMatch = html.match(/<meta[^>]+property=["']og:image["'][^>]+content=["']([^"']+)["']/i) ||
+            html.match(/<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:image["']/i);
+
+        if (ogImageMatch && ogImageMatch[1]) {
+            let ogImage = ogImageMatch[1];
+            // Ensure full URL
+            if (ogImage.startsWith('//')) {
+                ogImage = 'https:' + ogImage;
+            } else if (!ogImage.startsWith('http')) {
+                // Relative URL - try to make absolute
+                const urlObj = new URL(articleUrl);
+                ogImage = urlObj.origin + ogImage;
+            }
+            console.log('✅ Found og:image:', ogImage);
+            return ogImage;
+        }
+
+        // Fallback: try twitter:image
+        const twitterImageMatch = html.match(/<meta[^>]+name=["']twitter:image["'][^>]+content=["']([^"']+)["']/i);
+        if (twitterImageMatch && twitterImageMatch[1]) {
+            console.log('✅ Found twitter:image:', twitterImageMatch[1]);
+            return twitterImageMatch[1];
+        }
+
+    } catch (error) {
+        console.warn('OG image fetch error:', error.message);
+    }
+
+    return null;
+}
+
+// Update share card image with real og:image (called after modal opens)
+async function updateShareCardImage(article) {
+    const imgElement = document.getElementById('shareCardImage');
+    if (!imgElement || !article.link) return;
+
+    const ogImage = await fetchArticleOGImage(article.link, article.category);
+    if (ogImage) {
+        imgElement.src = ogImage;
+        // Also update the article object so download uses this image
+        article.image = ogImage;
+    }
 }
 
 async function generateAISummary(article) {
