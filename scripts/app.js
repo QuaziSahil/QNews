@@ -243,6 +243,15 @@ async function openArticleModal(articleId, pushState = true) {
                         <div class="insight-label">Key Insight</div>
                         <div class="insight-text">${summary}</div>
                     </div>
+                    </div>
+                    
+                    ${article.bulletPoints && article.bulletPoints.length > 0 ? `
+                    <div class="share-card-bullets">
+                        <ul class="bullets-list">
+                            ${article.bulletPoints.map(point => `<li>${point}</li>`).join('')}
+                        </ul>
+                    </div>
+                    ` : ''}
                 </div>
                 
                 <div class="share-card-footer">
@@ -846,28 +855,42 @@ function extractBulletPoints(content, title) {
 }
 
 function extractImage(item, rawText) {
-    // Try multiple methods
+    // 1. Try media:content (standard for high res)
     const mediaContent = item.querySelector('content');
     if (mediaContent?.getAttribute('url')) {
-        return mediaContent.getAttribute('url');
+        let url = mediaContent.getAttribute('url');
+        // Times of India specific: try to get high res
+        if (url.includes('photo.cms')) {
+            return url.replace('photo.cms', 'photohd.cms'); // Fake upgrade attempt
+        }
+        return url;
     }
 
+    // 2. Try media:thumbnail (often smaller but reliable)
     const thumbnail = item.querySelector('thumbnail');
     if (thumbnail?.getAttribute('url')) {
-        return thumbnail.getAttribute('url');
+        return thumbnail.getAttribute('url').replace('width=400', 'width=800').replace('size=400', 'size=800');
     }
 
+    // 3. Try enclosure (podcast/RSS standard)
     const enclosure = item.querySelector('enclosure');
     if (enclosure?.getAttribute('url') && enclosure.getAttribute('type')?.includes('image')) {
         return enclosure.getAttribute('url');
     }
 
+    // 4. Try parsing description HTML for the first image
     const description = item.querySelector('description')?.textContent || '';
     const imgMatch = description.match(/<img[^>]+src=["']([^"']+)["']/i);
     if (imgMatch?.[1]) {
-        return imgMatch[1];
+        // TOI/others sometimes put small thumbnails in description. 
+        // Try to heuristic upgrade:
+        let src = imgMatch[1];
+        if (src.includes('width=')) src = src.replace(/width=\d+/, 'width=800');
+        if (src.includes('size=')) src = src.replace(/size=\d+/, 'size=800');
+        return src;
     }
 
+    // 5. Try encoded content (full article HTML)
     const contentEncoded = item.querySelector('encoded')?.textContent || '';
     const contentImgMatch = contentEncoded.match(/<img[^>]+src=["']([^"']+)["']/i);
     if (contentImgMatch?.[1]) {
