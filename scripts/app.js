@@ -240,21 +240,8 @@ async function openArticleModal(articleId, pushState = true) {
                     <h2 class="share-card-title">${article.title}</h2>
                     
                     <div class="share-card-insight">
-                        <div class="insight-label">✨ Key Insight</div>
+                        <div class="insight-label">Key Insight</div>
                         <div class="insight-text">${summary}</div>
-                    </div>
-                    
-                    ${article.bulletPoints && article.bulletPoints.length > 0 ? `
-                    <div class="share-card-bullets">
-                        <div class="bullets-label">📍 Key Points</div>
-                        <ul class="bullets-list">
-                            ${article.bulletPoints.map(point => `<li>${point}</li>`).join('')}
-                        </ul>
-                    </div>
-                    ` : ''}
-                    
-                    <div class="share-card-tags">
-                        ${tags.map(tag => `<span class="share-tag">${tag}</span>`).join('')}
                     </div>
                 </div>
                 
@@ -276,7 +263,6 @@ async function openArticleModal(articleId, pushState = true) {
                             </svg>
                             ${new Date(article.pubDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                         </span>
-                        <span class="meta-item">🔥 Trending</span>
                     </div>
                     <span class="share-card-source">via ${article.source}</span>
                 </div>
