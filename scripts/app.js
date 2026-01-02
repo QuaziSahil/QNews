@@ -1,63 +1,48 @@
 /* ========================================
    Q NEWS - Main Application Script
-   Optimized: Faster loading, Working AI, Shareable URLs
+   Powered by NewsAPI with Indian News Focus
    ======================================== */
 
 // Configuration
 const CONFIG = {
-    corsProxies: [
-        'https://corsproxy.io/?',
-        'https://api.codetabs.com/v1/proxy?quest=',
-        'https://thingproxy.freeboard.io/fetch/'
-    ],
-    currentProxyIndex: 0,
-    feeds: {
-        tech: 'https://feeds.feedburner.com/TechCrunch',
-        world: 'https://feeds.bbci.co.uk/news/world/rss.xml',
-        sports: 'https://feeds.bbci.co.uk/sport/rss.xml',
-        entertainment: 'https://www.theverge.com/rss/index.xml',
-        science: 'https://www.sciencedaily.com/rss/all.xml',
-        business: 'https://feeds.bbci.co.uk/news/business/rss.xml'
-    },
+    newsApiKey: '551b83b440be41659bec53180adead18',
+    newsApiBase: 'https://newsapi.org/v2',
+    country: 'in', // India
+    categories: ['general', 'technology', 'sports', 'entertainment', 'science', 'business'],
+    pageSize: 20, // Articles per category
     categoryImages: {
-        tech: [
-            'https://images.unsplash.com/photo-1518770660439-4636190af475?w=600',
-            'https://images.unsplash.com/photo-1550751827-4bd374c3f58b?w=600',
-            'https://images.unsplash.com/photo-1519389950473-47ba0277781c?w=600',
-            'https://images.unsplash.com/photo-1531297484001-80022131f5a1?w=600'
+        general: [
+            'https://images.unsplash.com/photo-1495020689067-958852a7765e?w=800',
+            'https://images.unsplash.com/photo-1504711434969-e33886168f5c?w=800',
+            'https://images.unsplash.com/photo-1585829365295-ab7cd400c167?w=800'
         ],
-        world: [
-            'https://images.unsplash.com/photo-1451187580459-43490279c0fa?w=600',
-            'https://images.unsplash.com/photo-1526470608268-f674ce90ebd4?w=600',
-            'https://images.unsplash.com/photo-1495020689067-958852a7765e?w=600',
-            'https://images.unsplash.com/photo-1504711434969-e33886168f5c?w=600'
+        technology: [
+            'https://images.unsplash.com/photo-1518770660439-4636190af475?w=800',
+            'https://images.unsplash.com/photo-1550751827-4bd374c3f58b?w=800',
+            'https://images.unsplash.com/photo-1531297484001-80022131f5a1?w=800'
         ],
         sports: [
-            'https://images.unsplash.com/photo-1461896836934-ffe607ba8211?w=600',
-            'https://images.unsplash.com/photo-1517649763962-0c623066013b?w=600',
-            'https://images.unsplash.com/photo-1579952363873-27f3bade9f55?w=600',
-            'https://images.unsplash.com/photo-1574629810360-7efbbe195018?w=600'
+            'https://images.unsplash.com/photo-1461896836934-ffe607ba8211?w=800',
+            'https://images.unsplash.com/photo-1517649763962-0c623066013b?w=800',
+            'https://images.unsplash.com/photo-1579952363873-27f3bade9f55?w=800'
         ],
         entertainment: [
-            'https://images.unsplash.com/photo-1598387993441-a364f854c3e1?w=600',
-            'https://images.unsplash.com/photo-1536440136628-849c177e76a1?w=600',
-            'https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?w=600',
-            'https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?w=600'
+            'https://images.unsplash.com/photo-1598387993441-a364f854c3e1?w=800',
+            'https://images.unsplash.com/photo-1536440136628-849c177e76a1?w=800',
+            'https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?w=800'
         ],
         science: [
-            'https://images.unsplash.com/photo-1507413245164-6160d8298b31?w=600',
-            'https://images.unsplash.com/photo-1532094349884-543bc11b234d?w=600',
-            'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=600',
-            'https://images.unsplash.com/photo-1451187580459-43490279c0fa?w=600'
+            'https://images.unsplash.com/photo-1507413245164-6160d8298b31?w=800',
+            'https://images.unsplash.com/photo-1532094349884-543bc11b234d?w=800',
+            'https://images.unsplash.com/photo-1451187580459-43490279c0fa?w=800'
         ],
         business: [
-            'https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?w=600',
-            'https://images.unsplash.com/photo-1460925895917-afdab827c52f?w=600',
-            'https://images.unsplash.com/photo-1507679799987-c73779587ccf?w=600',
-            'https://images.unsplash.com/photo-1444653614773-995cb1ef9efa?w=600'
+            'https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?w=800',
+            'https://images.unsplash.com/photo-1460925895917-afdab827c52f?w=800',
+            'https://images.unsplash.com/photo-1507679799987-c73779587ccf?w=800'
         ]
     },
-    articlesPerPage: 12
+    articlesPerPage: 15
 };
 
 // State
@@ -248,6 +233,15 @@ async function openArticleModal(articleId, pushState = true) {
                         <div class="insight-label">✨ Key Insight</div>
                         <div class="insight-text">${summary}</div>
                     </div>
+                    
+                    ${article.bulletPoints && article.bulletPoints.length > 0 ? `
+                    <div class="share-card-bullets">
+                        <div class="bullets-label">📍 Key Points</div>
+                        <ul class="bullets-list">
+                            ${article.bulletPoints.map(point => `<li>${point}</li>`).join('')}
+                        </ul>
+                    </div>
+                    ` : ''}
                     
                     <div class="share-card-tags">
                         ${tags.map(tag => `<span class="share-tag">${tag}</span>`).join('')}
@@ -702,7 +696,7 @@ function filterArticles(filter) {
 }
 
 // ========================================
-// RSS Feed Fetching (Optimized)
+// NewsAPI Fetching (Indian News with HD Images)
 // ========================================
 
 async function loadAllFeeds() {
@@ -710,26 +704,20 @@ async function loadAllFeeds() {
     showLoadingState();
 
     try {
-        // Load feeds in parallel with timeout
-        const feedPromises = Object.entries(CONFIG.feeds).map(([category, url]) =>
-            Promise.race([
-                fetchFeed(url, category),
-                new Promise((_, reject) => setTimeout(() => reject('timeout'), 8000))
-            ]).catch(err => {
-                console.warn(`Feed ${category} failed:`, err);
-                return [];
-            })
+        // Fetch all categories in parallel
+        const categoryPromises = CONFIG.categories.map(category =>
+            fetchNewsAPI(category)
         );
 
-        const results = await Promise.all(feedPromises);
+        const results = await Promise.all(categoryPromises);
 
-        results.forEach(feedArticles => {
-            if (Array.isArray(feedArticles)) {
-                allArticles.push(...feedArticles);
+        results.forEach(categoryArticles => {
+            if (Array.isArray(categoryArticles)) {
+                allArticles.push(...categoryArticles);
             }
         });
 
-        // Sort by date
+        // Sort by date (newest first)
         allArticles.sort((a, b) => new Date(b.pubDate) - new Date(a.pubDate));
 
         // Store in map for quick lookup
@@ -741,78 +729,101 @@ async function loadAllFeeds() {
             animateNumber(elements.totalArticles, allArticles.length);
         }
 
+        console.log(`✅ Loaded ${allArticles.length} total articles from NewsAPI`);
+
         renderTrendingCarousel();
         renderNewsGrid();
 
     } catch (error) {
-        console.error('Error loading feeds:', error);
+        console.error('Error loading news:', error);
         showError('Failed to load news. Please refresh the page.');
     }
 
     isLoading = false;
 }
 
-async function fetchFeed(url, category) {
-    // Try each proxy until one works
-    for (let i = 0; i < CONFIG.corsProxies.length; i++) {
-        try {
-            const proxy = CONFIG.corsProxies[i];
-            const proxyUrl = proxy + encodeURIComponent(url);
+async function fetchNewsAPI(category) {
+    try {
+        const url = `${CONFIG.newsApiBase}/top-headlines?country=${CONFIG.country}&category=${category}&pageSize=${CONFIG.pageSize}&apiKey=${CONFIG.newsApiKey}`;
 
-            const response = await fetch(proxyUrl);
-            if (!response.ok) continue;
+        const response = await fetch(url);
+        const data = await response.json();
 
-            const text = await response.text();
-            if (!text || text.length < 100) continue;
+        if (data.status !== 'ok' || !data.articles) {
+            console.warn(`NewsAPI error for ${category}:`, data.message);
+            return [];
+        }
 
-            const parser = new DOMParser();
-            const xml = parser.parseFromString(text, 'text/xml');
-
-            const items = xml.querySelectorAll('item');
-            if (items.length === 0) continue;
-
-            const articles = [];
-
-            items.forEach((item, index) => {
-                if (index >= 15) return;
-
-                const title = item.querySelector('title')?.textContent || '';
-                const link = item.querySelector('link')?.textContent || '';
-                const description = item.querySelector('description')?.textContent || '';
-                const pubDate = item.querySelector('pubDate')?.textContent || new Date().toISOString();
-
-                let image = extractImage(item, text);
-
-                if (!image) {
+        const articles = data.articles
+            .filter(article => article.title && article.title !== '[Removed]')
+            .map((article, index) => {
+                // Get HD image from API or fallback
+                let image = article.urlToImage;
+                if (!image || image.includes('placeholder')) {
                     image = getRandomImage(category);
                 }
 
-                const articleId = `${category}-${index}`;
+                // Extract content for bullet points
+                const content = article.content || article.description || '';
+                const bulletPoints = extractBulletPoints(content, article.title);
 
-                articles.push({
-                    id: articleId,
-                    title: cleanText(title),
-                    description: cleanText(description),
-                    link,
-                    pubDate,
-                    image,
-                    category,
-                    source: getSourceName(url),
-                    summarized: false
-                });
+                return {
+                    id: `${category}-${index}`,
+                    title: article.title,
+                    description: article.description || '',
+                    content: content,
+                    bulletPoints: bulletPoints,
+                    link: article.url,
+                    pubDate: article.publishedAt,
+                    image: image,
+                    category: category,
+                    source: article.source?.name || 'News',
+                    author: article.author || null
+                };
             });
 
-            console.log(`✅ Loaded ${articles.length} articles for ${category} via proxy ${i + 1}`);
-            return articles;
+        console.log(`✅ Loaded ${articles.length} ${category} articles from India`);
+        return articles;
 
-        } catch (error) {
-            console.warn(`Proxy ${i + 1} failed for ${category}:`, error.message);
-            continue;
-        }
+    } catch (error) {
+        console.error(`Error fetching ${category}:`, error);
+        return [];
+    }
+}
+
+// Extract bullet points from content
+function extractBulletPoints(content, title) {
+    if (!content || content.length < 50) {
+        return [];
     }
 
-    console.error(`❌ All proxies failed for ${category}`);
-    return [];
+    // Clean content
+    let cleanContent = content
+        .replace(/\[\+\d+ chars\]/g, '')
+        .replace(/\s+/g, ' ')
+        .trim();
+
+    // Split into sentences
+    const sentences = cleanContent.match(/[^.!?]+[.!?]+/g) || [];
+
+    const points = [];
+    const titleLower = title.toLowerCase();
+
+    for (const sentence of sentences) {
+        const trimmed = sentence.trim();
+
+        // Skip short sentences, title repetitions, and filler
+        if (trimmed.length < 30) continue;
+        if (titleLower.includes(trimmed.toLowerCase().substring(0, 40))) continue;
+        if (trimmed.toLowerCase().includes('click here')) continue;
+        if (trimmed.toLowerCase().includes('read more')) continue;
+
+        points.push(trimmed);
+
+        if (points.length >= 3) break;
+    }
+
+    return points;
 }
 
 function extractImage(item, rawText) {
