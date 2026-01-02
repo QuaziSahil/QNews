@@ -468,32 +468,57 @@ async function downloadShareCard(articleId) {
     const originalText = btn.innerHTML;
     btn.innerHTML = `
         <span class="loading-spinner"></span>
-        Generating image...
+        Generating HD image...
     `;
     btn.disabled = true;
 
     try {
-        // Use html2canvas to capture the card
+        // Wait for image to fully load
+        const img = card.querySelector('img');
+        if (img && !img.complete) {
+            await new Promise((resolve) => {
+                img.onload = resolve;
+                img.onerror = resolve;
+                setTimeout(resolve, 2000); // Timeout fallback
+            });
+        }
+
+        // Use html2canvas with maximum quality settings
         const canvas = await html2canvas(card, {
-            scale: 2, // High resolution for social media
+            scale: 3, // 3x resolution for crisp social media quality
             backgroundColor: '#1a1a2e',
             logging: false,
             useCORS: true,
-            allowTaint: true
+            allowTaint: true,
+            imageTimeout: 5000,
+            removeContainer: true,
+            // Improve rendering quality
+            onclone: (clonedDoc) => {
+                const clonedCard = clonedDoc.getElementById('shareCard');
+                if (clonedCard) {
+                    clonedCard.style.transform = 'none';
+                    clonedCard.style.borderRadius = '24px';
+                }
+            }
         });
+
+        // Create high quality PNG
+        const ctx = canvas.getContext('2d');
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = 'high';
 
         // Convert to blob and download
         canvas.toBlob((blob) => {
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            a.download = `qnews-${articleId}.png`;
+            a.download = `QNews-${articleId}-HD.png`;
             document.body.appendChild(a);
             a.click();
             document.body.removeChild(a);
             URL.revokeObjectURL(url);
 
-            showToast('📸 Card downloaded! Ready to share on social media.', 'success');
+            showToast('📸 HD card downloaded! Perfect for Instagram, Twitter & LinkedIn.', 'success');
         }, 'image/png', 1.0);
 
     } catch (error) {
