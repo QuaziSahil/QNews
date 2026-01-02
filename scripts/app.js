@@ -818,24 +818,30 @@ async function loadAllFeeds() {
     isLoading = false;
 }
 
-// Fetch articles from GNews.io API
+// Fetch articles from GNews.io API (via AllOrigins JSON proxy)
 async function fetchGNewsAPI(topic) {
-    // Build GNews URL and wrap in CORS proxy
+    // Build GNews URL
     const gnewsUrl = `${CONFIG.gnewsBaseUrl}?topic=${topic}&country=${CONFIG.country}&lang=${CONFIG.lang}&max=10&apikey=${CONFIG.gnewsApiKey}`;
-    const url = CONFIG.corsProxy + encodeURIComponent(gnewsUrl);
 
-    const response = await fetch(url);
+    // Use AllOrigins /get endpoint (returns JSON with 'contents' property)
+    const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(gnewsUrl)}`;
+
+    const response = await fetch(proxyUrl);
 
     if (!response.ok) {
-        throw new Error(`GNews API error: ${response.status}`);
+        throw new Error(`Proxy error: ${response.status}`);
     }
 
-    const data = await response.json();
+    // AllOrigins returns { contents: "..." } - parse the contents
+    const proxyData = await response.json();
+    const data = JSON.parse(proxyData.contents);
 
     if (!data.articles || data.articles.length === 0) {
         console.warn(`No articles found for topic: ${topic}`);
         return [];
     }
+
+    console.log(`✅ Loaded ${data.articles.length} articles for ${topic}`);
 
     return data.articles.map((article, index) => {
         const content = article.description || article.content || '';
@@ -847,7 +853,7 @@ async function fetchGNewsAPI(topic) {
             bulletPoints: extractBulletPoints(content, article.title),
             link: article.url,
             pubDate: article.publishedAt,
-            image: article.image || getRandomImage(topic), // GNews provides image directly!
+            image: article.image || getRandomImage(topic),
             category: topic,
             source: article.source?.name || 'GNews'
         };
