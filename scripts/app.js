@@ -1,6 +1,6 @@
 /* ========================================
    Q NEWS - Main Application Script
-   RSS Fetching, AI Summarization, Geolocation
+   RSS Fetching, AI Summarization, In-App Reader
    ======================================== */
 
 // Configuration
@@ -14,20 +14,51 @@ const CONFIG = {
         science: 'https://www.sciencedaily.com/rss/all.xml',
         business: 'https://feeds.bbci.co.uk/news/business/rss.xml'
     },
-    defaultImages: {
-        tech: 'https://images.unsplash.com/photo-1518770660439-4636190af475?w=600',
-        world: 'https://images.unsplash.com/photo-1451187580459-43490279c0fa?w=600',
-        sports: 'https://images.unsplash.com/photo-1461896836934-ffe607ba8211?w=600',
-        entertainment: 'https://images.unsplash.com/photo-1598387993441-a364f854c3e1?w=600',
-        science: 'https://images.unsplash.com/photo-1507413245164-6160d8298b31?w=600',
-        business: 'https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?w=600'
+    categoryImages: {
+        tech: [
+            'https://images.unsplash.com/photo-1518770660439-4636190af475?w=600',
+            'https://images.unsplash.com/photo-1550751827-4bd374c3f58b?w=600',
+            'https://images.unsplash.com/photo-1519389950473-47ba0277781c?w=600',
+            'https://images.unsplash.com/photo-1531297484001-80022131f5a1?w=600'
+        ],
+        world: [
+            'https://images.unsplash.com/photo-1451187580459-43490279c0fa?w=600',
+            'https://images.unsplash.com/photo-1526470608268-f674ce90ebd4?w=600',
+            'https://images.unsplash.com/photo-1495020689067-958852a7765e?w=600',
+            'https://images.unsplash.com/photo-1504711434969-e33886168f5c?w=600'
+        ],
+        sports: [
+            'https://images.unsplash.com/photo-1461896836934-ffe607ba8211?w=600',
+            'https://images.unsplash.com/photo-1517649763962-0c623066013b?w=600',
+            'https://images.unsplash.com/photo-1579952363873-27f3bade9f55?w=600',
+            'https://images.unsplash.com/photo-1574629810360-7efbbe195018?w=600'
+        ],
+        entertainment: [
+            'https://images.unsplash.com/photo-1598387993441-a364f854c3e1?w=600',
+            'https://images.unsplash.com/photo-1536440136628-849c177e76a1?w=600',
+            'https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?w=600',
+            'https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?w=600'
+        ],
+        science: [
+            'https://images.unsplash.com/photo-1507413245164-6160d8298b31?w=600',
+            'https://images.unsplash.com/photo-1532094349884-543bc11b234d?w=600',
+            'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=600',
+            'https://images.unsplash.com/photo-1451187580459-43490279c0fa?w=600'
+        ],
+        business: [
+            'https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?w=600',
+            'https://images.unsplash.com/photo-1460925895917-afdab827c52f?w=600',
+            'https://images.unsplash.com/photo-1507679799987-c73779587ccf?w=600',
+            'https://images.unsplash.com/photo-1444653614773-995cb1ef9efa?w=600'
+        ]
     },
     articlesPerPage: 12,
-    cacheDuration: 5 * 60 * 1000 // 5 minutes
+    cacheDuration: 5 * 60 * 1000
 };
 
 // State
 let allArticles = [];
+let articlesMap = new Map(); // Store articles by ID for quick lookup
 let displayedArticles = 0;
 let currentCategory = 'all';
 let userLocation = null;
@@ -54,6 +85,7 @@ const elements = {
 // ========================================
 
 document.addEventListener('DOMContentLoaded', async () => {
+    createArticleModal();
     initParticles();
     initTheme();
     initNavigation();
@@ -64,6 +96,201 @@ document.addEventListener('DOMContentLoaded', async () => {
     await loadAllFeeds();
     hidePreloader();
 });
+
+// ========================================
+// Article Modal
+// ========================================
+
+function createArticleModal() {
+    const modal = document.createElement('div');
+    modal.id = 'articleModal';
+    modal.className = 'article-modal';
+    modal.innerHTML = `
+        <button class="article-close" onclick="closeArticleModal()">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M18 6L6 18M6 6l12 12"/>
+            </svg>
+        </button>
+        <div class="article-modal-content" id="articleModalContent">
+            <!-- Content injected dynamically -->
+        </div>
+    `;
+    document.body.appendChild(modal);
+
+    // Close on backdrop click
+    modal.addEventListener('click', (e) => {
+        if (e.target === modal) closeArticleModal();
+    });
+
+    // Close on Escape key
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') closeArticleModal();
+    });
+}
+
+async function openArticleModal(articleId) {
+    const article = articlesMap.get(articleId);
+    if (!article) return;
+
+    const modal = document.getElementById('articleModal');
+    const content = document.getElementById('articleModalContent');
+
+    // Show modal with loading state
+    modal.classList.add('open');
+    document.body.style.overflow = 'hidden';
+
+    content.innerHTML = `
+        <div class="article-header">
+            <span class="article-category">${article.category}</span>
+            <h1 class="article-title">${article.title}</h1>
+            <div class="article-meta">
+                <span class="article-meta-item">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="10"/>
+                        <path d="M12 6v6l4 2"/>
+                    </svg>
+                    ${getTimeAgo(article.pubDate)}
+                </span>
+                <span class="article-meta-item">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/>
+                    </svg>
+                    ${article.source}
+                </span>
+            </div>
+        </div>
+        
+        <img src="${article.image}" alt="${article.title}" class="article-image" 
+             onerror="this.src='${getRandomImage(article.category)}'">
+        
+        <div class="article-ai-summary">
+            <div class="ai-summary-header">
+                <span class="ai-summary-badge">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
+                    </svg>
+                    AI Summary
+                </span>
+            </div>
+            <p class="ai-summary-text" id="aiSummaryText">
+                <span class="ai-summary-loading">
+                    <span class="loading-spinner"></span>
+                    Generating AI summary...
+                </span>
+            </p>
+        </div>
+        
+        <div class="article-body">
+            <p>${article.description || 'Full article content available at the source.'}</p>
+        </div>
+        
+        <div class="article-key-points" id="keyPointsSection" style="display: none;">
+            <h4 class="key-points-title">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M9 11l3 3L22 4"/>
+                    <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>
+                </svg>
+                Key Points
+            </h4>
+            <ul class="key-points-list" id="keyPointsList"></ul>
+        </div>
+        
+        <div class="article-footer">
+            <button class="article-source-btn" onclick="window.open('${article.link}', '_blank')">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
+                    <polyline points="15 3 21 3 21 9"/>
+                    <line x1="10" y1="14" x2="21" y2="3"/>
+                </svg>
+                Read Full Article at Source
+            </button>
+            <div class="article-share-btns">
+                <button class="share-btn" onclick="shareArticle('twitter', '${encodeURIComponent(article.title)}', '${encodeURIComponent(article.link)}')" title="Share on Twitter">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
+                    </svg>
+                </button>
+                <button class="share-btn" onclick="shareArticle('linkedin', '${encodeURIComponent(article.title)}', '${encodeURIComponent(article.link)}')" title="Share on LinkedIn">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433c-1.144 0-2.063-.926-2.063-2.065 0-1.138.92-2.063 2.063-2.063 1.14 0 2.064.925 2.064 2.063 0 1.139-.925 2.065-2.064 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/>
+                    </svg>
+                </button>
+                <button class="share-btn" onclick="copyToClipboard('${article.link}')" title="Copy Link">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
+                        <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+                    </svg>
+                </button>
+            </div>
+        </div>
+    `;
+
+    // Generate AI summary
+    await generateAISummary(article);
+}
+
+function closeArticleModal() {
+    const modal = document.getElementById('articleModal');
+    modal.classList.remove('open');
+    document.body.style.overflow = '';
+}
+
+async function generateAISummary(article) {
+    const summaryEl = document.getElementById('aiSummaryText');
+    const keyPointsSection = document.getElementById('keyPointsSection');
+    const keyPointsList = document.getElementById('keyPointsList');
+
+    try {
+        if (typeof puter === 'undefined' || !puter.ai) {
+            // Fallback without AI
+            summaryEl.textContent = article.description || 'No summary available.';
+            return;
+        }
+
+        // Generate summary
+        const summaryPrompt = `You are a news summarizer. Summarize this news article in 2-3 engaging sentences. Be concise and informative:
+
+Title: ${article.title}
+Content: ${article.description}`;
+
+        const summary = await puter.ai.chat(summaryPrompt, { model: 'gpt-4o-mini' });
+        summaryEl.textContent = summary || article.description;
+
+        // Generate key points
+        const keyPointsPrompt = `Extract 3-4 key bullet points from this news. Return ONLY the bullet points, one per line, no numbers or dashes:
+
+Title: ${article.title}
+Content: ${article.description}`;
+
+        const keyPoints = await puter.ai.chat(keyPointsPrompt, { model: 'gpt-4o-mini' });
+
+        if (keyPoints) {
+            const points = keyPoints.split('\n').filter(p => p.trim().length > 0).slice(0, 4);
+            if (points.length > 0) {
+                keyPointsList.innerHTML = points.map(p => `<li>${p.replace(/^[-•*]\s*/, '')}</li>`).join('');
+                keyPointsSection.style.display = 'block';
+            }
+        }
+
+    } catch (error) {
+        console.error('AI generation failed:', error);
+        summaryEl.textContent = article.description || 'Summary generation failed.';
+    }
+}
+
+function shareArticle(platform, title, url) {
+    const shareUrls = {
+        twitter: `https://twitter.com/intent/tweet?text=${title}&url=${url}`,
+        linkedin: `https://www.linkedin.com/sharing/share-offsite/?url=${url}`
+    };
+    window.open(shareUrls[platform], '_blank', 'width=600,height=400');
+}
+
+function copyToClipboard(text) {
+    navigator.clipboard.writeText(text).then(() => {
+        showToast('Link copied to clipboard!', 'success');
+    });
+}
 
 // ========================================
 // Preloader
@@ -119,7 +346,6 @@ function initTheme() {
 // ========================================
 
 function initNavigation() {
-    // Nav links
     document.querySelectorAll('.nav-link').forEach(link => {
         link.addEventListener('click', (e) => {
             e.preventDefault();
@@ -128,19 +354,14 @@ function initNavigation() {
         });
     });
 
-    // Mobile toggle
     elements.navToggle?.addEventListener('click', () => {
         document.querySelector('.nav-links')?.classList.toggle('mobile-open');
     });
 
-    // Location button
     elements.locationBtn?.addEventListener('click', requestLocation);
     elements.refreshLocal?.addEventListener('click', loadLocalNews);
-
-    // Load more button
     elements.loadMoreBtn?.addEventListener('click', loadMoreArticles);
 
-    // Carousel controls
     document.getElementById('trendingPrev')?.addEventListener('click', () => scrollCarousel(-1));
     document.getElementById('trendingNext')?.addEventListener('click', () => scrollCarousel(1));
 }
@@ -191,8 +412,6 @@ function initCategoryCards() {
         card.addEventListener('click', () => {
             const category = card.dataset.category;
             setActiveCategory(category);
-
-            // Scroll to news feed
             document.querySelector('.news-feed')?.scrollIntoView({ behavior: 'smooth' });
         });
     });
@@ -221,7 +440,6 @@ function filterArticles(filter) {
         const today = new Date().toDateString();
         filtered = filtered.filter(a => new Date(a.pubDate).toDateString() === today);
     } else if (filter === 'popular') {
-        // Simulate popularity by shuffling
         filtered = filtered.sort(() => Math.random() - 0.5);
     }
 
@@ -253,7 +471,11 @@ async function loadAllFeeds() {
         // Sort by date
         allArticles.sort((a, b) => new Date(b.pubDate) - new Date(a.pubDate));
 
-        // Update stats
+        // Store in map for quick lookup
+        allArticles.forEach(article => {
+            articlesMap.set(article.id, article);
+        });
+
         if (elements.totalArticles) {
             animateNumber(elements.totalArticles, allArticles.length);
         }
@@ -280,27 +502,25 @@ async function fetchFeed(url, category) {
         const articles = [];
 
         items.forEach((item, index) => {
-            if (index >= 20) return; // Limit per feed
+            if (index >= 20) return;
 
             const title = item.querySelector('title')?.textContent || '';
             const link = item.querySelector('link')?.textContent || '';
             const description = item.querySelector('description')?.textContent || '';
             const pubDate = item.querySelector('pubDate')?.textContent || new Date().toISOString();
 
-            // Try to extract image
-            let image = '';
-            const mediaContent = item.querySelector('content, media\\:content, enclosure');
-            if (mediaContent) {
-                image = mediaContent.getAttribute('url') || '';
+            // Enhanced image extraction
+            let image = extractImage(item, text);
+
+            // Use random category image if no image found
+            if (!image) {
+                image = getRandomImage(category);
             }
 
-            // Fallback to default image
-            if (!image) {
-                image = CONFIG.defaultImages[category];
-            }
+            const articleId = `${category}-${index}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 
             articles.push({
-                id: `${category}-${index}-${Date.now()}`,
+                id: articleId,
                 title: cleanText(title),
                 description: cleanText(description),
                 link,
@@ -320,6 +540,49 @@ async function fetchFeed(url, category) {
     }
 }
 
+function extractImage(item, rawText) {
+    // Try multiple methods to extract image
+
+    // Method 1: media:content
+    const mediaContent = item.querySelector('content');
+    if (mediaContent?.getAttribute('url')) {
+        return mediaContent.getAttribute('url');
+    }
+
+    // Method 2: media:thumbnail
+    const thumbnail = item.querySelector('thumbnail');
+    if (thumbnail?.getAttribute('url')) {
+        return thumbnail.getAttribute('url');
+    }
+
+    // Method 3: enclosure
+    const enclosure = item.querySelector('enclosure');
+    if (enclosure?.getAttribute('url') && enclosure.getAttribute('type')?.includes('image')) {
+        return enclosure.getAttribute('url');
+    }
+
+    // Method 4: Extract from description HTML
+    const description = item.querySelector('description')?.textContent || '';
+    const imgMatch = description.match(/<img[^>]+src=["']([^"']+)["']/i);
+    if (imgMatch?.[1]) {
+        return imgMatch[1];
+    }
+
+    // Method 5: Look for image in content:encoded
+    const contentEncoded = item.querySelector('encoded')?.textContent || '';
+    const contentImgMatch = contentEncoded.match(/<img[^>]+src=["']([^"']+)["']/i);
+    if (contentImgMatch?.[1]) {
+        return contentImgMatch[1];
+    }
+
+    return null;
+}
+
+function getRandomImage(category) {
+    const images = CONFIG.categoryImages[category] || CONFIG.categoryImages.world;
+    return images[Math.floor(Math.random() * images.length)];
+}
+
 // ========================================
 // AI Summarization (Puter.js)
 // ========================================
@@ -328,14 +591,12 @@ async function summarizeArticle(article) {
     if (article.summarized || !article.description) return article;
 
     try {
-        // Check if Puter is available
         if (typeof puter === 'undefined' || !puter.ai) {
-            // Fallback: simple truncation
             article.summary = truncateText(article.description, 150);
             return article;
         }
 
-        const prompt = `Summarize this news in 2 punchy, engaging sentences (max 100 words): "${article.description}"`;
+        const prompt = `Summarize this news in 2 punchy sentences (max 80 words): "${article.description}"`;
 
         const response = await puter.ai.chat(prompt, {
             model: 'gpt-4o-mini'
@@ -362,9 +623,9 @@ function renderTrendingCarousel() {
     const trending = allArticles.slice(0, 8);
 
     elements.trendingCarousel.innerHTML = trending.map((article, index) => `
-        <article class="trending-card" onclick="openArticle('${article.link}')">
+        <article class="trending-card" onclick="openArticleModal('${article.id}')">
             <img src="${article.image}" alt="${article.title}" class="trending-card-bg" 
-                 onerror="this.src='${CONFIG.defaultImages[article.category]}'">
+                 onerror="this.src='${getRandomImage(article.category)}'">
             <div class="trending-card-overlay"></div>
             <div class="trending-card-rank">${index + 1}</div>
             <div class="trending-card-content">
@@ -385,7 +646,6 @@ function renderNewsGrid(articles = null) {
 
     let source = articles || allArticles;
 
-    // Filter by category
     if (currentCategory !== 'all') {
         source = source.filter(a => a.category === currentCategory);
     }
@@ -398,17 +658,14 @@ function renderNewsGrid(articles = null) {
     }
 
     toShow.forEach(async (article, index) => {
-        // Summarize with AI
         await summarizeArticle(article);
 
         const card = createNewsCard(article, index);
         elements.newsGrid.appendChild(card);
 
-        // Trigger reveal animation
         setTimeout(() => card.classList.add('visible'), index * 100);
     });
 
-    // Hide load more if no more articles
     if (elements.loadMoreBtn) {
         elements.loadMoreBtn.style.display = displayedArticles >= source.length ? 'none' : 'flex';
     }
@@ -418,12 +675,12 @@ function createNewsCard(article, index) {
     const card = document.createElement('article');
     card.className = 'news-card reveal';
     card.style.transitionDelay = `${index * 0.1}s`;
-    card.onclick = () => openArticle(article.link);
+    card.onclick = () => openArticleModal(article.id);
 
     card.innerHTML = `
         <div class="news-card-image">
             <img src="${article.image}" alt="${article.title}" 
-                 onerror="this.src='${CONFIG.defaultImages[article.category]}'" loading="lazy">
+                 onerror="this.src='${getRandomImage(article.category)}'" loading="lazy">
             <span class="news-card-category">${article.category}</span>
         </div>
         <div class="news-card-content">
@@ -478,7 +735,6 @@ async function requestLocation() {
             lng: position.coords.longitude
         };
 
-        // Get location name via reverse geocoding
         await getLocationName();
         await loadLocalNews();
 
@@ -513,17 +769,15 @@ async function getLocationName() {
 async function loadLocalNews() {
     if (!elements.localNewsGrid) return;
 
-    // For now, show random selection since we don't have true local news feeds
-    // In production, you'd use a location-based news API
     const localArticles = allArticles
         .filter(a => a.category === 'world')
         .slice(0, 6);
 
     elements.localNewsGrid.innerHTML = localArticles.map(article => `
-        <article class="local-card" onclick="openArticle('${article.link}')">
+        <article class="local-card" onclick="openArticleModal('${article.id}')">
             <div class="local-card-image">
                 <img src="${article.image}" alt="${article.title}"
-                     onerror="this.src='${CONFIG.defaultImages.world}'" loading="lazy">
+                     onerror="this.src='${getRandomImage('world')}'" loading="lazy">
             </div>
             <div class="local-card-content">
                 <h4 class="local-card-title">${article.title}</h4>
@@ -537,14 +791,10 @@ async function loadLocalNews() {
 // Utility Functions
 // ========================================
 
-function openArticle(url) {
-    window.open(url, '_blank', 'noopener,noreferrer');
-}
-
 function cleanText(text) {
     if (!text) return '';
     return text
-        .replace(/<[^>]*>/g, '') // Remove HTML tags
+        .replace(/<[^>]*>/g, '')
         .replace(/&nbsp;/g, ' ')
         .replace(/&amp;/g, '&')
         .replace(/&lt;/g, '<')
@@ -615,12 +865,22 @@ function showLoadingState() {
 }
 
 function showError(message) {
+    showToast(message, 'error');
+}
+
+function showToast(message, type = 'info') {
     const toast = document.createElement('div');
-    toast.className = 'toast toast-error';
+    toast.className = `toast toast-${type}`;
+
+    const icons = {
+        success: '<path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/>',
+        error: '<circle cx="12" cy="12" r="10"/><path d="M15 9l-6 6M9 9l6 6"/>',
+        info: '<circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/>'
+    };
+
     toast.innerHTML = `
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <circle cx="12" cy="12" r="10"/>
-            <path d="M15 9l-6 6M9 9l6 6"/>
+            ${icons[type] || icons.info}
         </svg>
         <span>${message}</span>
     `;
@@ -634,11 +894,14 @@ function showError(message) {
 
     container.appendChild(toast);
 
-    setTimeout(() => toast.remove(), 5000);
+    setTimeout(() => toast.remove(), 4000);
 }
 
 // ========================================
-// Export for global access
+// Global Functions
 // ========================================
 
-window.openArticle = openArticle;
+window.openArticleModal = openArticleModal;
+window.closeArticleModal = closeArticleModal;
+window.shareArticle = shareArticle;
+window.copyToClipboard = copyToClipboard;
