@@ -8,7 +8,9 @@ const CONFIG = {
     // GNews.io API (Free tier: 100 requests/day, 10 articles/request)
     gnewsApiKey: '1bc056413abc05db4bae2fe021208af7',
     gnewsBaseUrl: 'https://gnews.io/api/v4/top-headlines',
+    corsProxy: 'https://api.allorigins.win/raw?url=', // CORS proxy for GNews
     topics: ['general', 'technology', 'sports', 'entertainment', 'business', 'science'],
+    categories: ['general', 'technology', 'sports', 'entertainment', 'business', 'science'], // Alias for demo data
     country: 'in', // India
     lang: 'en',
     categoryImages: {
@@ -818,7 +820,9 @@ async function loadAllFeeds() {
 
 // Fetch articles from GNews.io API
 async function fetchGNewsAPI(topic) {
-    const url = `${CONFIG.gnewsBaseUrl}?topic=${topic}&country=${CONFIG.country}&lang=${CONFIG.lang}&max=10&apikey=${CONFIG.gnewsApiKey}`;
+    // Build GNews URL and wrap in CORS proxy
+    const gnewsUrl = `${CONFIG.gnewsBaseUrl}?topic=${topic}&country=${CONFIG.country}&lang=${CONFIG.lang}&max=10&apikey=${CONFIG.gnewsApiKey}`;
+    const url = CONFIG.corsProxy + encodeURIComponent(gnewsUrl);
 
     const response = await fetch(url);
 
