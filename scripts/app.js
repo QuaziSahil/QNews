@@ -243,7 +243,6 @@ async function openArticleModal(articleId, pushState = true) {
                         <div class="insight-label">Key Insight</div>
                         <div class="insight-text">${summary}</div>
                     </div>
-                    </div>
                     
                     ${article.bulletPoints && article.bulletPoints.length > 0 ? `
                     <div class="share-card-bullets">
@@ -252,6 +251,7 @@ async function openArticleModal(articleId, pushState = true) {
                         </ul>
                     </div>
                     ` : ''}
+                </div>
                 </div>
                 
                 <div class="share-card-footer">

@@ -1,25 +1,30 @@
 /* ========================================
    Social Media Share Card Styles
-   Optimized for Portrait (4:5) Layout - Best for Instagram/Twitter
+   Optimized for Portrait (4:5) Layout
    ======================================== */
 
 /* Share Card Container */
 .share-card-wrapper {
     position: relative;
     margin: 2rem 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
 }
 
 .share-card {
     position: relative;
     width: 100%;
-    max-width: 480px;
-    /* Optimal width for readability */
-    /* Portrait Ratio 4:5 (1080x1350) - Perfect for feeds */
-    aspect-ratio: 4/5;
+    /* Fixed width for consistency in export */
+    width: 450px !important;
+    max-width: 100%;
+    /* Exact 4:5 Portrait Ratio (1080x1350 scale) */
+    height: 562.5px !important;
+    /* 450 * 1.25 */
     margin: 0 auto;
     border-radius: 20px;
     overflow: hidden;
-    background: linear-gradient(135deg, #0f0f1a 0%, #1a1a2e 50%, #16213e 100%);
+    background: #0f0f1a;
     box-shadow:
         0 30px 60px -15px rgba(0, 0, 0, 0.6),
         0 0 0 1px rgba(255, 255, 255, 0.1);
@@ -34,9 +39,10 @@
 .share-card-hero {
     position: relative;
     width: 100%;
-    /* Occupy top ~45% of the card */
-    height: 45%;
+    /* 40% height for image to leave room for text */
+    height: 40%;
     overflow: hidden;
+    flex-shrink: 0;
 }
 
 .share-card-hero img {
@@ -44,25 +50,24 @@
     height: 100%;
     object-fit: cover;
     object-position: center;
-    transition: transform 0.5s ease;
 }
 
-/* Gradient overlay for text readability */
+/* Gradient overlay */
 .share-card-hero::after {
     content: '';
     position: absolute;
     bottom: 0;
     left: 0;
     right: 0;
-    height: 50%;
+    height: 60%;
     background: linear-gradient(to top,
             #0f0f1a 0%,
-            rgba(15, 15, 26, 0.8) 30%,
+            rgba(15, 15, 26, 0.8) 40%,
             rgba(15, 15, 26, 0) 100%);
     pointer-events: none;
 }
 
-/* Floating branding on image */
+/* Branding */
 .share-card-hero-branding {
     position: absolute;
     top: 20px;
@@ -78,7 +83,7 @@
     display: flex;
     align-items: center;
     gap: 8px;
-    background: rgba(0, 0, 0, 0.4);
+    background: rgba(0, 0, 0, 0.5);
     padding: 6px 12px;
     border-radius: 12px;
     backdrop-filter: blur(8px);
@@ -93,30 +98,28 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    font-family: 'Orbitron', sans-serif;
-    font-weight: 900;
     font-size: 12px;
     color: white;
 }
 
 .share-card-hero-branding .logo-text {
     font-family: 'Orbitron', sans-serif;
-    font-size: 12px;
+    font-size: 11px;
     font-weight: 700;
-    letter-spacing: 0.12em;
+    letter-spacing: 0.1em;
     color: white;
 }
 
 .share-card-category {
-    padding: 6px 14px;
-    font-size: 10px;
+    padding: 6px 12px;
+    font-size: 9px;
     font-weight: 800;
     text-transform: uppercase;
     letter-spacing: 0.1em;
     color: white;
     background: linear-gradient(135deg, #6366f1, #8b5cf6);
     border-radius: 100px;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
 }
 
 .share-card-category.technology {
@@ -135,12 +138,12 @@
     background: linear-gradient(135deg, #ec4899, #8b5cf6);
 }
 
-.share-card-category.science {
-    background: linear-gradient(135deg, #8b5cf6, #6366f1);
-}
-
 .share-card-category.business {
     background: linear-gradient(135deg, #14b8a6, #06b6d4);
+}
+
+.share-card-category.science {
+    background: linear-gradient(135deg, #8b5cf6, #6366f1);
 }
 
 /* ========================================
@@ -149,72 +152,73 @@
 
 .share-card-content {
     flex: 1;
-    padding: 24px 28px;
-    position: relative;
+    padding: 20px 24px;
     display: flex;
     flex-direction: column;
-    gap: 16px;
+    gap: 14px;
     background: #0f0f1a;
+    overflow: hidden;
 }
 
 .share-card-title {
     font-family: 'Space Grotesk', sans-serif;
-    font-size: 22px;
+    font-size: 20px;
+    /* Reduced for better fit */
     font-weight: 700;
-    line-height: 1.35;
+    line-height: 1.3;
     color: white;
     margin: 0;
-    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
-    /* Allow up to 3-4 lines */
+    /* Limit to 4 lines strict */
     display: -webkit-box;
     -webkit-line-clamp: 4;
+    line-clamp: 4;
     -webkit-box-orient: vertical;
     overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 /* Key Insight Box */
 .share-card-insight {
     position: relative;
-    padding: 16px;
-    background: linear-gradient(135deg, rgba(99, 102, 241, 0.1) 0%, rgba(236, 72, 153, 0.05) 100%);
-    border-radius: 12px;
+    padding: 14px;
+    background: linear-gradient(135deg, rgba(99, 102, 241, 0.08) 0%, rgba(236, 72, 153, 0.04) 100%);
+    border-radius: 10px;
     border-left: 3px solid #6366f1;
+    margin-bottom: 4px;
 }
 
 .insight-label {
-    font-size: 10px;
+    font-size: 9px;
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.1em;
     color: #a78bfa;
-    margin-bottom: 8px;
+    margin-bottom: 6px;
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: 5px;
 }
 
 .insight-label::before {
     content: '⚡';
-    font-size: 12px;
 }
 
 .insight-text {
-    font-size: 14px;
+    font-size: 13px;
     font-weight: 500;
-    line-height: 1.6;
+    line-height: 1.5;
     color: #e0e7ff;
-    /* Limit to 4 lines */
     display: -webkit-box;
-    -webkit-line-clamp: 4;
+    -webkit-line-clamp: 3;
+    line-clamp: 3;
     -webkit-box-orient: vertical;
     overflow: hidden;
 }
 
-/* Bullet Points (Restored & Styled) */
+/* Bullet Points */
 .share-card-bullets {
     margin-top: auto;
-    /* Push to bottom of content area */
-    padding-top: 12px;
+    padding-top: 10px;
     border-top: 1px solid rgba(255, 255, 255, 0.05);
 }
 
@@ -228,20 +232,26 @@
 }
 
 .bullets-list li {
-    font-size: 13px;
-    color: rgba(255, 255, 255, 0.8);
-    padding-left: 16px;
+    font-size: 12px;
+    color: rgba(255, 255, 255, 0.75);
+    padding-left: 18px;
     position: relative;
     line-height: 1.4;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
 }
 
 .bullets-list li::before {
-    content: '•';
+    content: '✓';
     color: #10b981;
-    font-size: 18px;
+    font-weight: 800;
+    font-size: 12px;
     position: absolute;
     left: 0;
-    top: -2px;
+    top: 0;
 }
 
 /* ========================================
@@ -252,45 +262,43 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 16px 28px;
+    padding: 14px 24px;
     background: #0b0b14;
     border-top: 1px solid rgba(255, 255, 255, 0.05);
+    flex-shrink: 0;
 }
 
 .share-card-meta {
     display: flex;
     align-items: center;
-    gap: 16px;
+    gap: 14px;
 }
 
 .meta-item {
     display: flex;
     align-items: center;
-    gap: 6px;
-    font-size: 11px;
+    gap: 5px;
+    font-size: 10px;
     font-weight: 600;
     color: rgba(255, 255, 255, 0.5);
     text-transform: uppercase;
-    letter-spacing: 0.05em;
 }
 
 .meta-item svg {
-    width: 14px;
-    height: 14px;
+    width: 12px;
+    height: 12px;
     opacity: 0.7;
-    stroke-width: 2.5;
 }
 
 .share-card-source {
-    font-size: 11px;
+    font-size: 10px;
     font-weight: 700;
     color: #6366f1;
     text-transform: uppercase;
-    letter-spacing: 0.05em;
 }
 
 /* ========================================
-   Download Button & Utilities
+   Download Button
    ======================================== */
 
 .download-card-btn {
@@ -299,8 +307,9 @@
     justify-content: center;
     gap: 10px;
     width: 100%;
-    max-width: 480px;
-    margin: 20px auto 0;
+    max-width: 450px;
+    margin: 30px auto 10px;
+    /* Added more top margin */
     padding: 16px;
     font-size: 15px;
     font-weight: 700;
@@ -310,15 +319,14 @@
     border-radius: 14px;
     cursor: pointer;
     transition: all 0.3s ease;
-    box-shadow: 0 10px 30px rgba(99, 102, 241, 0.3);
+    box-shadow: 0 8px 25px rgba(99, 102, 241, 0.3);
 }
 
 .download-card-btn:hover {
     transform: translateY(-2px);
-    box-shadow: 0 15px 40px rgba(99, 102, 241, 0.4);
+    box-shadow: 0 12px 35px rgba(99, 102, 241, 0.4);
 }
 
-/* Hide tags explicitly as requested */
 .share-card-tags {
     display: none !important;
 }
@@ -326,10 +334,8 @@
 /* Mobile Responsive */
 @media (max-width: 640px) {
     .share-card {
-        max-width: 100%;
-        aspect-ratio: auto;
-        min-height: 600px;
-        /* Fallback for mobile view */
-        border-radius: 16px;
+        width: 100% !important;
+        height: auto !important;
+        aspect-ratio: 4/5;
     }
 }
