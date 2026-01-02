@@ -312,37 +312,25 @@ function closeArticleModal() {
     updateURL(null); // Clear article from URL
 }
 
-// Fetch the actual og:image using Microlink.io API (reliable, no CORS issues)
+// Fetch og:image via our serverless API (no CORS issues!)
 async function fetchArticleOGImage(articleUrl) {
     try {
-        // Microlink.io API - extracts og:image reliably without CORS issues
-        const apiUrl = `https://api.microlink.io?url=${encodeURIComponent(articleUrl)}`;
-
-        const response = await fetch(apiUrl, {
-            signal: AbortSignal.timeout(8000) // 8 second timeout
-        });
+        const response = await fetch(`/api/og?url=${encodeURIComponent(articleUrl)}`);
 
         if (!response.ok) {
-            console.warn('Microlink API failed:', response.status);
+            console.warn('OG API failed:', response.status);
             return null;
         }
 
         const data = await response.json();
 
-        // Check if we got an image
-        if (data.status === 'success' && data.data?.image?.url) {
-            console.log('✅ Microlink found image:', data.data.image.url);
-            return data.data.image.url;
-        }
-
-        // Fallback: try logo if no image
-        if (data.data?.logo?.url) {
-            console.log('✅ Microlink found logo:', data.data.logo.url);
-            return data.data.logo.url;
+        if (data.success && data.image) {
+            console.log('✅ Found og:image:', data.image);
+            return data.image;
         }
 
     } catch (error) {
-        console.warn('Microlink fetch error:', error.message);
+        console.warn('OG fetch error:', error.message);
     }
 
     return null;
@@ -351,31 +339,47 @@ async function fetchArticleOGImage(articleUrl) {
 // Update share card image with real og:image (called after modal opens)
 async function updateShareCardImage(article) {
     const imgElement = document.getElementById('shareCardImage');
+    const insightText = document.querySelector('.insight-text');
+
     if (!imgElement || !article.link) return;
 
     // Show loading state
     imgElement.style.opacity = '0.7';
 
-    const ogImage = await fetchArticleOGImage(article.link);
+    try {
+        const response = await fetch(`/api/og?url=${encodeURIComponent(article.link)}`);
+        const data = await response.json();
 
-    if (ogImage) {
-        // Preload the image before swapping
-        const tempImg = new Image();
-        tempImg.crossOrigin = 'anonymous';
-        tempImg.onload = () => {
-            imgElement.src = ogImage;
+        if (data.success) {
+            // Update image if found
+            if (data.image) {
+                const tempImg = new Image();
+                tempImg.crossOrigin = 'anonymous';
+                tempImg.onload = () => {
+                    imgElement.src = data.image;
+                    imgElement.style.opacity = '1';
+                    article.image = data.image;
+                    console.log('✅ Share card updated with real image');
+                };
+                tempImg.onerror = () => {
+                    imgElement.style.opacity = '1';
+                };
+                tempImg.src = data.image;
+            } else {
+                imgElement.style.opacity = '1';
+            }
+
+            // Update description/insight if found
+            if (data.description && insightText) {
+                insightText.textContent = data.description.substring(0, 150);
+                article.description = data.description;
+            }
+        } else {
             imgElement.style.opacity = '1';
-            // Update article object so download uses this image
-            article.image = ogImage;
-            console.log('✅ Share card image updated');
-        };
-        tempImg.onerror = () => {
-            imgElement.style.opacity = '1';
-            console.warn('❌ og:image failed to load, keeping fallback');
-        };
-        tempImg.src = ogImage;
-    } else {
+        }
+    } catch (error) {
         imgElement.style.opacity = '1';
+        console.warn('Share card update failed:', error);
     }
 }
 
