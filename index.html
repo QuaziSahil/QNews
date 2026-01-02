@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Q News - Your Premium News Experience</title>
+    <meta name="description" content="AI-powered news aggregator with stunning visuals and smart summaries">
+
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=Orbitron:wght@400;500;600;700;800;900&display=swap"
+        rel="stylesheet">
+
+    <!-- Puter.js for AI -->
+    <script src="https://js.puter.com/v2/"></script>
+
+    <!-- Styles -->
+    <link rel="stylesheet" href="styles/main.css">
+    <link rel="stylesheet" href="styles/animations.css">
+    <link rel="stylesheet" href="styles/components.css">
+</head>
+
+<body>
+    <!-- Preloader -->
+    <div class="preloader" id="preloader">
+        <div class="preloader-content">
+            <div class="preloader-logo">
+                <span class="logo-q">Q</span>
+                <span class="logo-text">NEWS</span>
+            </div>
+            <div class="preloader-bar">
+                <div class="preloader-progress"></div>
+            </div>
+            <p class="preloader-text">Loading the latest stories...</p>
+        </div>
+    </div>
+
+    <!-- Animated Background -->
+    <div class="bg-gradient"></div>
+    <div class="bg-particles" id="particles"></div>
+
+    <!-- Navigation -->
+    <nav class="navbar">
+        <div class="nav-container">
+            <a href="/" class="logo">
+                <span class="logo-q">Q</span>
+                <span class="logo-text">NEWS</span>
+            </a>
+
+            <div class="nav-links">
+                <a href="#" class="nav-link active" data-category="all">All</a>
+                <a href="#" class="nav-link" data-category="tech">Tech</a>
+                <a href="#" class="nav-link" data-category="world">World</a>
+                <a href="#" class="nav-link" data-category="sports">Sports</a>
+                <a href="#" class="nav-link" data-category="entertainment">Entertainment</a>
+                <a href="#" class="nav-link" data-category="science">Science</a>
+            </div>
+
+            <div class="nav-actions">
+                <button class="btn-location" id="locationBtn" title="Get Local News">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
+                        <circle cx="12" cy="10" r="3" />
+                    </svg>
+                    <span class="location-text">Local</span>
+                </button>
+                <button class="btn-theme" id="themeBtn" title="Toggle Theme">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="5" />
+                        <path
+                            d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42" />
+                    </svg>
+                </button>
+            </div>
+
+            <button class="nav-toggle" id="navToggle">
+                <span></span>
+                <span></span>
+                <span></span>
+            </button>
+        </div>
+    </nav>
+
+    <!-- Hero Section -->
+    <header class="hero">
+        <div class="hero-content">
+            <div class="hero-badge">
+                <span class="badge-dot"></span>
+                <span>AI-Powered News</span>
+            </div>
+            <h1 class="hero-title">
+                <span class="title-line">Stay Informed.</span>
+                <span class="title-line gradient-text">Stay Ahead.</span>
+            </h1>
+            <p class="hero-subtitle">Your personalized news experience with AI-generated summaries, delivered in
+                stunning visual format.</p>
+            <div class="hero-stats">
+                <div class="stat">
+                    <span class="stat-number" id="totalArticles">0</span>
+                    <span class="stat-label">Articles Today</span>
+                </div>
+                <div class="stat">
+                    <span class="stat-number">6</span>
+                    <span class="stat-label">Categories</span>
+                </div>
+                <div class="stat">
+                    <span class="stat-number">AI</span>
+                    <span class="stat-label">Summaries</span>
+                </div>
+            </div>
+        </div>
+        <div class="hero-visual">
+            <div class="floating-cards">
+                <div class="float-card card-1"></div>
+                <div class="float-card card-2"></div>
+                <div class="float-card card-3"></div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Trending Section -->
+    <section class="section trending">
+        <div class="container">
+            <div class="section-header">
+                <h2 class="section-title">
+                    <span class="title-icon">🔥</span>
+                    Trending Now
+                </h2>
+                <div class="carousel-controls">
+                    <button class="control-btn" id="trendingPrev">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2">
+                            <path d="M15 18l-6-6 6-6" />
+                        </svg>
+                    </button>
+                    <button class="control-btn" id="trendingNext">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2">
+                            <path d="M9 18l6-6-6-6" />
+                        </svg>
+                    </button>
+                </div>
+            </div>
+            <div class="trending-carousel" id="trendingCarousel">
+                <!-- Trending cards injected by JS -->
+            </div>
+        </div>
+    </section>
+
+    <!-- Categories Grid -->
+    <section class="section categories">
+        <div class="container">
+            <h2 class="section-title">
+                <span class="title-icon">📂</span>
+                Browse Categories
+            </h2>
+            <div class="categories-grid">
+                <div class="category-card" data-category="tech">
+                    <div class="category-icon">💻</div>
+                    <h3>Technology</h3>
+                    <p>Latest in tech, gadgets & innovation</p>
+                    <div class="category-glow"></div>
+                </div>
+                <div class="category-card" data-category="world">
+                    <div class="category-icon">🌍</div>
+                    <h3>World</h3>
+                    <p>Global headlines & breaking news</p>
+                    <div class="category-glow"></div>
+                </div>
+                <div class="category-card" data-category="sports">
+                    <div class="category-icon">⚽</div>
+                    <h3>Sports</h3>
+                    <p>Scores, highlights & analysis</p>
+                    <div class="category-glow"></div>
+                </div>
+                <div class="category-card" data-category="entertainment">
+                    <div class="category-icon">🎬</div>
+                    <h3>Entertainment</h3>
+                    <p>Movies, music & pop culture</p>
+                    <div class="category-glow"></div>
+                </div>
+                <div class="category-card" data-category="science">
+                    <div class="category-icon">🔬</div>
+                    <h3>Science</h3>
+                    <p>Discoveries & breakthroughs</p>
+                    <div class="category-glow"></div>
+                </div>
+                <div class="category-card" data-category="business">
+                    <div class="category-icon">📈</div>
+                    <h3>Business</h3>
+                    <p>Markets, finance & economy</p>
+                    <div class="category-glow"></div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Local News Section -->
+    <section class="section local-news" id="localSection">
+        <div class="container">
+            <div class="section-header">
+                <h2 class="section-title">
+                    <span class="title-icon">📍</span>
+                    <span id="locationTitle">Local News</span>
+                </h2>
+                <button class="btn-refresh" id="refreshLocal">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M23 4v6h-6M1 20v-6h6" />
+                        <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />
+                    </svg>
+                    Refresh
+                </button>
+            </div>
+            <div class="local-news-grid" id="localNewsGrid">
+                <!-- Local news cards injected by JS -->
+            </div>
+        </div>
+    </section>
+
+    <!-- Main News Feed -->
+    <section class="section news-feed">
+        <div class="container">
+            <div class="section-header">
+                <h2 class="section-title">
+                    <span class="title-icon">📰</span>
+                    Latest Stories
+                </h2>
+                <div class="filter-tabs">
+                    <button class="filter-tab active" data-filter="all">All</button>
+                    <button class="filter-tab" data-filter="today">Today</button>
+                    <button class="filter-tab" data-filter="popular">Popular</button>
+                </div>
+            </div>
+            <div class="news-grid" id="newsGrid">
+                <!-- News cards injected by JS -->
+            </div>
+            <div class="load-more">
+                <button class="btn-load-more" id="loadMoreBtn">
+                    <span>Load More Stories</span>
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M12 5v14M5 12l7 7 7-7" />
+                    </svg>
+                </button>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="container">
+            <div class="footer-content">
+                <div class="footer-brand">
+                    <a href="/" class="logo">
+                        <span class="logo-q">Q</span>
+                        <span class="logo-text">NEWS</span>
+                    </a>
+                    <p>Your premium AI-powered news experience.</p>
+                </div>
+                <div class="footer-links">
+                    <div class="footer-col">
+                        <h4>Categories</h4>
+                        <a href="#">Technology</a>
+                        <a href="#">World</a>
+                        <a href="#">Sports</a>
+                    </div>
+                    <div class="footer-col">
+                        <h4>More</h4>
+                        <a href="#">Entertainment</a>
+                        <a href="#">Science</a>
+                        <a href="#">Business</a>
+                    </div>
+                    <div class="footer-col">
+                        <h4>About</h4>
+                        <a href="#">About Q News</a>
+                        <a href="#">Privacy Policy</a>
+                        <a href="#">Contact</a>
+                    </div>
+                </div>
+            </div>
+            <div class="footer-bottom">
+                <p>© 2026 Q News. Powered by AI. Built with ❤️</p>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Scripts -->
+    <script src="scripts/app.js" type="module"></script>
+</body>
+
+</html>
