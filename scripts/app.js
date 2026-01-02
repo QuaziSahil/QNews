@@ -744,13 +744,18 @@ async function loadAllFeeds() {
 
 async function fetchNewsAPI(category) {
     try {
-        const url = `${CONFIG.newsApiBase}/top-headlines?country=${CONFIG.country}&category=${category}&pageSize=${CONFIG.pageSize}&apiKey=${CONFIG.newsApiKey}`;
+        // NewsAPI free tier requires CORS proxy in production
+        const newsApiUrl = `${CONFIG.newsApiBase}/top-headlines?country=${CONFIG.country}&category=${category}&pageSize=${CONFIG.pageSize}&apiKey=${CONFIG.newsApiKey}`;
+
+        // Use CORS proxy for production
+        const corsProxy = 'https://corsproxy.io/?';
+        const url = corsProxy + encodeURIComponent(newsApiUrl);
 
         const response = await fetch(url);
         const data = await response.json();
 
         if (data.status !== 'ok' || !data.articles) {
-            console.warn(`NewsAPI error for ${category}:`, data.message);
+            console.warn(`NewsAPI error for ${category}:`, data.message || 'Unknown error');
             return [];
         }
 
