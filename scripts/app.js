@@ -196,6 +196,11 @@ async function openArticleModal(articleId, pushState = true) {
     // Build shareable URL
     const shareUrl = `${window.location.origin}${window.location.pathname}?article=${articleId}`;
 
+    // Generate smart summary and tags
+    const summary = createSmartSummary(article.description, article.title);
+    const tags = extractTags(article.title, article.description, article.category);
+    const readTime = Math.max(1, Math.ceil((article.description?.split(' ').length || 50) / 200));
+
     content.innerHTML = `
         <div class="article-header">
             <span class="article-category">${article.category}</span>
@@ -217,37 +222,67 @@ async function openArticleModal(articleId, pushState = true) {
             </div>
         </div>
         
-        <img src="${article.image}" alt="${article.title}" class="article-image" 
-             onerror="this.src='${getRandomImage(article.category)}'">
-        
-        <div class="article-ai-summary" id="aiSummaryBox">
-            <div class="ai-summary-header">
-                <span class="ai-summary-badge">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
-                    </svg>
-                    AI SUMMARY
-                </span>
+        <!-- Gorgeous Share Card for Social Media -->
+        <div class="share-card-wrapper">
+            <div class="share-card" id="shareCard">
+                <div class="share-card-decoration decoration-1"></div>
+                <div class="share-card-decoration decoration-2"></div>
+                
+                <div class="share-card-header">
+                    <div class="share-card-branding">
+                        <div class="share-card-logo">
+                            <div class="logo-icon">Q</div>
+                            <span>NEWS</span>
+                        </div>
+                        <span class="share-card-category ${article.category}">${article.category.toUpperCase()}</span>
+                    </div>
+                </div>
+                
+                <div class="share-card-content">
+                    <h2 class="share-card-title">${article.title}</h2>
+                    
+                    <div class="share-card-insight">
+                        <div class="insight-label">✨ Key Insight</div>
+                        <div class="insight-text">${summary}</div>
+                    </div>
+                    
+                    <div class="share-card-tags">
+                        ${tags.map(tag => `<span class="share-tag">${tag}</span>`).join('')}
+                    </div>
+                </div>
+                
+                <div class="share-card-footer">
+                    <div class="share-card-meta">
+                        <span class="meta-item">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <circle cx="12" cy="12" r="10"/>
+                                <path d="M12 6v6l4 2"/>
+                            </svg>
+                            ${readTime} min read
+                        </span>
+                        <span class="meta-item">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
+                                <line x1="16" y1="2" x2="16" y2="6"/>
+                                <line x1="8" y1="2" x2="8" y2="6"/>
+                                <line x1="3" y1="10" x2="21" y2="10"/>
+                            </svg>
+                            ${new Date(article.pubDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                        </span>
+                        <span class="meta-item">🔥 Trending</span>
+                    </div>
+                    <span class="share-card-source">via ${article.source}</span>
+                </div>
             </div>
-            <p class="ai-summary-text" id="aiSummaryText">
-                <span class="ai-summary-loading">
-                    <span class="loading-spinner"></span>
-                    Generating AI-powered summary...
-                </span>
-            </p>
-        </div>
-        
-        <div class="article-body">
-            <h4 style="color: var(--accent-tertiary); margin-bottom: 1rem; display: flex; align-items: center; gap: 0.5rem;">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-                    <polyline points="14 2 14 8 20 8"/>
-                    <line x1="16" y1="13" x2="8" y2="13"/>
-                    <line x1="16" y1="17" x2="8" y2="17"/>
+            
+            <button class="download-card-btn" onclick="downloadShareCard('${article.id}')">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                    <polyline points="7 10 12 15 17 10"/>
+                    <line x1="12" y1="15" x2="12" y2="3"/>
                 </svg>
-                Original Content
-            </h4>
-            <p>${article.description || 'Full article content available at the source.'}</p>
+                Download for Social Media
+            </button>
         </div>
         
         <div class="article-footer">
@@ -279,9 +314,6 @@ async function openArticleModal(articleId, pushState = true) {
             </div>
         </div>
     `;
-
-    // Generate AI summary asynchronously
-    generateAISummary(article);
 }
 
 function closeArticleModal() {
@@ -374,6 +406,100 @@ function createSmartSummary(text, title) {
     }
 
     return cleanedText;
+}
+
+// Extract relevant tags from content
+function extractTags(title, description, category) {
+    const text = `${title} ${description}`.toLowerCase();
+    const tags = [category];
+
+    // Common news topics
+    const topicPatterns = {
+        'ai': /\b(ai|artificial intelligence|machine learning|chatgpt|openai)\b/i,
+        'crypto': /\b(crypto|bitcoin|ethereum|blockchain|nft)\b/i,
+        'tesla': /\btesla\b/i,
+        'apple': /\bapple\b/i,
+        'google': /\bgoogle\b/i,
+        'microsoft': /\bmicrosoft\b/i,
+        'amazon': /\bamazon\b/i,
+        'climate': /\b(climate|environment|carbon|green)\b/i,
+        'space': /\b(space|nasa|spacex|rocket|mars|moon)\b/i,
+        'health': /\b(health|medicine|covid|vaccine|disease)\b/i,
+        'politics': /\b(election|vote|president|government|congress)\b/i,
+        'economy': /\b(economy|inflation|stock|market|gdp)\b/i,
+        'china': /\bchina\b/i,
+        'usa': /\b(usa|america|united states)\b/i,
+        'europe': /\b(europe|eu|european)\b/i
+    };
+
+    for (const [tag, pattern] of Object.entries(topicPatterns)) {
+        if (pattern.test(text) && !tags.includes(tag)) {
+            tags.push(tag);
+        }
+        if (tags.length >= 4) break;
+    }
+
+    // Ensure at least 3 tags
+    if (tags.length < 3) {
+        const fallbackTags = ['breaking', 'news', 'trending', 'update', 'latest'];
+        for (const tag of fallbackTags) {
+            if (!tags.includes(tag)) {
+                tags.push(tag);
+                if (tags.length >= 3) break;
+            }
+        }
+    }
+
+    return tags.slice(0, 4);
+}
+
+// Download share card as image for social media
+async function downloadShareCard(articleId) {
+    const card = document.getElementById('shareCard');
+    if (!card) {
+        showToast('Unable to generate image', 'error');
+        return;
+    }
+
+    const btn = document.querySelector('.download-card-btn');
+    const originalText = btn.innerHTML;
+    btn.innerHTML = `
+        <span class="loading-spinner"></span>
+        Generating image...
+    `;
+    btn.disabled = true;
+
+    try {
+        // Use html2canvas to capture the card
+        const canvas = await html2canvas(card, {
+            scale: 2, // High resolution for social media
+            backgroundColor: '#1a1a2e',
+            logging: false,
+            useCORS: true,
+            allowTaint: true
+        });
+
+        // Convert to blob and download
+        canvas.toBlob((blob) => {
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `qnews-${articleId}.png`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+
+            showToast('📸 Card downloaded! Ready to share on social media.', 'success');
+        }, 'image/png', 1.0);
+
+    } catch (error) {
+        console.error('Download failed:', error);
+        showToast('Failed to generate image. Try again.', 'error');
+    } finally {
+        btn.innerHTML = originalText;
+        btn.disabled = false;
+    }
 }
 
 function shareArticle(platform, title, url) {
@@ -985,3 +1111,4 @@ window.openArticleModal = openArticleModal;
 window.closeArticleModal = closeArticleModal;
 window.shareArticle = shareArticle;
 window.copyToClipboard = copyToClipboard;
+window.downloadShareCard = downloadShareCard;
