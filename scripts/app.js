@@ -369,10 +369,24 @@ async function updateShareCardImage(article) {
                 imgElement.style.opacity = '1';
             }
 
-            // Update description/insight if found
+            // Update description/insight AND bullet points if found
             if (data.description && insightText) {
-                insightText.textContent = data.description.substring(0, 150);
+                const realDesc = data.description.substring(0, 200);
+                insightText.textContent = realDesc;
                 article.description = data.description;
+
+                // Also update bullet points with real content
+                const bulletsList = document.querySelector('.bullets-list');
+                if (bulletsList && data.description.length > 50) {
+                    const sentences = data.description.split(/[.!?]+/).filter(s => s.trim().length > 20);
+                    if (sentences.length >= 2) {
+                        bulletsList.innerHTML = `
+                            <li>${sentences[0].trim().substring(0, 80)}...</li>
+                            <li>${sentences[1].trim().substring(0, 80)}...</li>
+                        `;
+                    }
+                }
+                console.log('✅ Updated description and bullet points');
             }
         } else {
             imgElement.style.opacity = '1';
